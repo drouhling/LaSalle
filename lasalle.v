@@ -173,24 +173,21 @@ exists (t0 + t1); split; first by lra.
 by rewrite solD; apply: (hpt0 (sol p t1)).
 Qed.
 
-(* TODO: change this... *)
-
-Definition limS (S : set U) : set U :=
-  fun p => exists q, S q /\ pos_limit_set (sol q) p.
+Definition limS (S : set U) := \bigcup_(q in S) pos_limit_set (sol q).
 
 Lemma invariant_limS S : is_invariant (limS S).
 Proof.
-move=> p [q [Sq plimxp]] t tge0.
-by exists q; split => //; exact: invariant_pos_limit_set.
+move=> p [q Sq plimxp] t tge0.
+by exists q => //; exact: invariant_pos_limit_set.
 Qed.
 
 Lemma stable_limS (S : set U) (V : U -> R) (V' : U -> U -> R) :
   compact S -> is_invariant S ->
   (forall p : U, S p -> filterdiff V (locally p) (V' p)) ->
   (forall p : U, S p -> (V' p \o X) p <= 0) ->
-  limS S `<=` (fun p : U => (V' p \o X) p) @^-1` [set 0].
+  limS S `<=` [set p | (V' p \o X) p = 0].
 Proof.
-move=> Sco Sinvar Vdif V'le0 p [q [Sq plimxp]].
+move=> Sco Sinvar Vdif V'le0 p [q Sq plimxp].
 have Vsol' r : S r -> forall t, 0 <= t ->
     is_derive (V \o sol r) t ((V' (sol r t) \o X) (sol r t)).
   move=> Sr t tge0; have Srt : S (sol r t) by apply: Sinvar.
@@ -206,8 +203,8 @@ have ssqRpS : sol q @` Rle 0 `<=` S.
   by move=> _ [t tge0 <-]; apply: Sinvar.
 suff : exists l, pos_limit_set (sol q) `<=` V @^-1` [set l].
   move=> [l Vpliml]; rewrite -[p]sol0; set y := sol p.
-  rewrite /preimage -[X in [set _] X](is_derive_unique (V \o y) 0).
-    rewrite (@derive_ext_ge0 _ (fun _ => l)); first exact: Derive_const.
+  rewrite -[LHS](is_derive_unique (V \o y) 0).
+    rewrite (@derive_ext_ge0 _ (fun=> l)); first exact: Derive_const.
       exact: Rle_refl.
     by move=> t tge0; apply/Vpliml/invariant_pos_limit_set.
   apply: Vsol'=> //; last exact: Rle_refl.
