@@ -204,7 +204,8 @@ Definition filter_of X Y
            (y : X)
            (_ : phant_id (canonical_filter_term f) y)
            := F.
-Notation "'[filter' 'of' F ]" := (@filter_of _ _ _ _ F idfun).
+Notation "[ 'filter' 'of' F ]" := (@filter_of _ _ _ _ F idfun)
+  (format "[ 'filter'  'of'  F ]").
 Arguments filter_of _ _ _ _ _ _ _ /.
 
 Notation "x @ F" := (filtermap x [filter of F])
@@ -214,6 +215,11 @@ Notation "F --> G" := (filter_le [filter of F] [filter of G])
   (at level 70, format "F  -->  G") : classical_set_scope.
 
 Notation "'+oo'" := p_infty : classical_set_scope.
+
+Definition cvg (U : UniformSpace) (F : set (set U)) : Prop :=
+  exists l : U, F --> l.
+Notation "[ 'cvg' F ]" := (cvg [filter of F])
+  (format "[ 'cvg'  F ]") : classical_set_scope.
 
 Section Cvg_to_set.
 
@@ -845,9 +851,6 @@ Qed.
 
 End Continuity.
 
-Definition ex_lim_seq (U : UniformSpace) (u : nat -> U) :=
-  exists l, filterlim u eventually (locally l).
-
 Lemma derive_ext_ge0 f g x :
   0 <= x -> (forall y, 0 <= y -> f y = g y) -> Derive f x = Derive g x.
 Proof.
@@ -878,8 +881,7 @@ Qed.
 
 Lemma ndecr_ub_cvg (f : R -> R) :
   (forall x y, 0 <= x <= y -> f x <= f y) ->
-  (exists M, f @` Rle 0 `<=` Rlt^~ M) ->
-  ex_finite_lim f +oo.
+  (exists M, f @` Rle 0 `<=` Rlt^~ M) -> [cvg f @ +oo].
 Proof.
   have fRn0 : f @` Rle 0 !=set0 by exists (f 0); apply/imageP/Rle_refl.
   move=> fndecr /(ub_finlub fRn0) [l [ubl lubl]].
@@ -911,23 +913,21 @@ Qed.
 
 Lemma nincr_lb_cvg (f : R -> R) :
   (forall x y, 0 <= x <= y -> f y <= f x) ->
-  (exists M, f @` Rle 0 `<=` Rlt M) ->
-  ex_finite_lim f +oo.
+  (exists M, f @` Rle 0 `<=` Rlt M) -> [cvg f @ +oo].
 Proof.
-  move=> fnincr [M MlbfR].
-  suff [l oppfcvl] : ex_finite_lim (fun x => - f x) +oo.
-    exists (Rbar_opp l).
-    apply: (is_lim_ext (fun x => - - f x)).
-      move=> x.
-      exact: Ropp_involutive.
-    exact: is_lim_opp oppfcvl.
-  apply: ndecr_ub_cvg.
-    move=> x y xley.
-    exact/Ropp_le_contravar/fnincr.
-  exists (- M).
-  move=> _ [x xge0 <-].
-  apply/Ropp_lt_contravar/MlbfR.
-  exact: imageP.
+move=> fnincr [M MlbfR].
+suff [l oppfcvl] : [cvg (fun x => - f x) @ +oo].
+  exists (- l).
+  apply: (filterlim_ext (fun x => - -f x)).
+    by move=> x; exact: Ropp_involutive.
+  by apply: filterlim_comp oppfcvl _; apply: filterlim_opp.
+apply: ndecr_ub_cvg.
+  move=> x y xley.
+  exact/Ropp_le_contravar/fnincr.
+exists (- M).
+move=> _ [x xge0 <-].
+apply/Ropp_lt_contravar/MlbfR.
+exact: imageP.
 Qed.
 
 Lemma nincr_function_le (f : R -> R) (a b : Rbar) (df : R -> R) :

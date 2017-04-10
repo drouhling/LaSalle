@@ -214,7 +214,7 @@ suff : exists l, pos_limit_set (sol q) `<=` V @^-1` [set l].
 have Vcont : continuous_on S V.
   apply: continuous_on_forall => r Sr.
   by apply: filterdiff_continuous; exists (V' r); apply: Vdif.
-suff [l Vxtol] : ex_finite_lim (V \o sol q) +oo.
+suff [l Vxtol] : [cvg V \o sol q @ +oo].
   exists l; apply: (c0_cvg_cst_on_pos_lim_set Vcont)=> //.
   exact: compact_closed.
 apply: nincr_lb_cvg.
