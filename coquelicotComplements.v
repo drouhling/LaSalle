@@ -152,34 +152,6 @@ Proof. by move=> sXZ sYZ a; apply: or_ind; [apply: sXZ|apply: sYZ]. Qed.
 Lemma setDE A (X Y : set A) : X `\` Y = X `&` ~` Y.
 Proof. by []. Qed.
 
-(* filter bases, not needed yet, maybe never *)
-Class FilterBase (T : Type) (B : set (set T)) := {
-  base_ex : B !=set0;
-  base_downward : forall P Q, B P -> B Q -> exists R, B R /\ R `<=` P `&` Q
-}.
-
-Global Instance Filter_is_Base T (F : set (set T)) : Filter F -> FilterBase F.
-Proof.
-move=> F_filter; split; first by exists setT; apply: filter_true.
-by move=> P Q FP FQ; exists (setI P Q); split; first exact: filter_and.
-Qed.
-
-Class ProperFilterBase (T : Type) (B : set (set T)) :=
-Build_ProperFilterBase {
-  base_not_empty : not (B set0);
-  base_base :> FilterBase B
-}.
-
-Global Instance ProperFilter_is_ProperBase T (F : set (set T)) :
-  ProperFilter F -> ProperFilterBase F.
-Proof.
-(* Show to Enrico for two reasons: *)
-(* 1/ difficulty to interrupt 2/ behaviour of apply/ *)
-(* by move=> Fproper; apply/Build_ProperFilterBase; apply/filter_not_empty. *)
-(* For Matthieu: why doesn't split solve typeclasses? *)
-by move=> Fproper; apply: Build_ProperFilterBase; apply: filter_not_empty.
-Qed.
-
 (* missing notation *)
 Definition normedModule_of (T : AbsRing) (_ : phantom Type (AbsRing.sort T)) :=
   NormedModule T.
