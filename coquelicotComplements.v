@@ -28,7 +28,8 @@ Local Open Scope classical_set_scope.
 Notation "[ 'set' x : T | P ]" := ((fun x => P) : set T)
   (at level 0, x at level 99, only parsing) : classical_set_scope.
 Notation "[ 'set' x | P ]" := [set x : _ | P]
-  (at level 0, x, P at level 99, format "[ 'set'  x  |  P ]") : classical_set_scope.
+  (at level 0, x, P at level 99, format "[ 'set'  x  |  P ]") :
+  classical_set_scope.
 
 Notation "[ 'set' E | x 'in' A ]" := [set y | exists2 x, A x & E = y]
   (at level 0, E, x at level 99,
@@ -158,7 +159,6 @@ Definition normedModule_of (T : AbsRing) (_ : phantom Type (AbsRing.sort T)) :=
 Notation "{ 'normedModule' T }" := (@normedModule_of _ (Phantom Type T))
   (at level 0, format "{ 'normedModule'  T }") : type_scope.
 
-
 (* frequent composition *)
 Lemma is_derive_shift K (V : NormedModule K) (f : K -> V) x l s :
   is_derive f (plus x s) l -> is_derive (fun y => f (plus y s)) x l.
@@ -172,41 +172,53 @@ apply: is_derive_plus.
 exact: is_derive_const.
 Qed.
 
-Structure canonical_filter_on X Y (F : set (set Y)) :=
- CanonicalFilterOn { canonical_filter_term : X }.
+Structure canonical_filter_on X Y := CanonicalFilterOn {
+  canonical_filter_term : X;
+  _ : set (set Y)
+}.
+Definition canonical_term_filter X Y (F : canonical_filter_on X Y) :=
+  let: CanonicalFilterOn x f := F in f.
 
-Structure canonical_filter X Y (F : X -> set (set Y)) :=
- CanonicalFilter { canonical_filter_type :> Type;
-                   _ : canonical_filter_type = X
-                   }.
+Structure canonical_filter Y := CanonicalFilter {
+  canonical_filter_type :> Type;
+  _ : canonical_filter_type -> set (set Y)
+}.
+Definition canonical_type_filter Y (F : canonical_filter Y) :
+  F -> set (set Y) :=
+  let: CanonicalFilter X f := F in f.
 
-Definition canonical_filter_eq X Y (F : X -> set (set Y))
-  (f : canonical_filter F) : f = X :> Type :=
-  let: CanonicalFilter _ e := f in e.
+Canonical default_filter_term Y (X : canonical_filter Y) (x : X) :=
+  @CanonicalFilterOn X Y x (canonical_type_filter x).
 
-Canonical default_filter_term X Y (F : X -> set (set Y))
-  (f : canonical_filter F) (x : canonical_filter_type f) :=
-  CanonicalFilterOn (F (ecast X X (canonical_filter_eq f) x)) x.
+Structure canonical_filter_source Z Y := CanonicalFilterSource {
+  canonical_filter_source_type :> Type;
+  _ : (canonical_filter_source_type -> Z) -> set (set Y)
+}.
+Definition canonical_source_filter Z Y (F : canonical_filter_source Z Y) :
+  (F -> Z) -> set (set Y) :=
+  let: CanonicalFilterSource X f := F in f.
 
-Canonical filter_filter Y := CanonicalFilter (@id ((Y -> _) -> _)) erefl.
+Canonical default_arrow_filter Y Z (X : canonical_filter_source Z Y) :=
+  @CanonicalFilter _ (X -> Z) (@canonical_source_filter _ _ X).
+
+Canonical source_filter_filter Y :=
+  @CanonicalFilterSource Prop _ (_ -> Prop) (@id (set (set Y))).
 
 Canonical filter_uniform_space (U : UniformSpace) :=
-  CanonicalFilter (@locally U) erefl.
+  @CanonicalFilter _ U (@locally U).
 
 Canonical filter_normed_module (K : AbsRing) (V : NormedModule K) :=
-  @CanonicalFilter _ _ (@locally V) (NormedModule.sort _ _) erefl.
+  @CanonicalFilter _  V (@locally V).
 
-Canonical filter_Rbar := CanonicalFilter (Rbar_locally) erefl.
-Canonical filter_R := CanonicalFilter (fun x : R => locally x) erefl.
+Canonical filter_Rbar := CanonicalFilter (Rbar_locally).
+Canonical filter_R := CanonicalFilter (fun x : R => locally x).
 
-Definition filter_of X Y
-           (F : (Y -> Prop) -> Prop) (f : canonical_filter_on X F)
-           (y : X)
-           (_ : phant_id (canonical_filter_term f) y)
-           := F.
-Notation "[ 'filter' 'of' F ]" := (@filter_of _ _ _ _ F idfun)
-  (format "[ 'filter'  'of'  F ]").
-Arguments filter_of _ _ _ _ _ _ _ /.
+Definition filter_of X Y (F : canonical_filter_on X Y)
+  (x : X) (_ : phant_id x (canonical_filter_term F)) :=
+  canonical_term_filter F.
+Notation "[ 'filter' 'of' x ]" := (@filter_of _ _ _ x idfun)
+  (format "[ 'filter'  'of'  x ]").
+Arguments filter_of _ _ _ _ _ _ /.
 
 Notation "x @ F" := (filtermap x [filter of F])
   (at level 60, format "x  @  F") : classical_set_scope.
@@ -216,6 +228,9 @@ Notation "F --> G" := (filter_le [filter of F] [filter of G])
 
 Notation "'+oo'" := p_infty : classical_set_scope.
 
+Canonical eventually_filter X :=
+  @CanonicalFilterSource X _ nat (fun f => f @ eventually).
+
 Definition cvg (U : UniformSpace) (F : set (set U)) : Prop :=
   exists l : U, F --> l.
 Notation "[ 'cvg' F ]" := (cvg [filter of F])
@@ -224,6 +239,8 @@ Notation "[ 'cvg' F ]" := (cvg [filter of F])
 Section Cvg_to_set.
 
 Variable (U : UniformSpace).
+Implicit Types (p : U) (A B : set U).
+
 (* The extension of a set with a band of width eps *)
 Definition ball_set (A : set U) (eps : posreal) :=
   \bigcup_(p in A) ball p eps.
@@ -231,7 +248,9 @@ Definition ball_set (A : set U) (eps : posreal) :=
 (* locally_set A P means that P holds for every point sufficiently near of A *)
 Definition locally_set (A : set U) :=
   [set B | exists eps, ball_set A eps `<=` B].
-Canonical filter_set_uniform_space := CanonicalFilter locally_set erefl.
+
+Canonical filter_set_uniform_space :=
+  @CanonicalFilterSource Prop _ U locally_set.
 
 Lemma locally_set1P (p : U) A : locally p A <-> locally_set [set p] A.
 Proof.
@@ -264,7 +283,7 @@ apply: Aeps2_C; exists q => //.
 exact: ball_le (Rmin_r _ _) _ q_near_p.
 Qed.
 
-Lemma cvg_to_set1P x p : x @ +oo --> [set p] <-> x @ +oo --> p.
+Lemma cvg_to_set1P (x : R -> U) p : x @ +oo --> [set p] <-> x @ +oo --> p.
 Proof. by split=> hx P /locally_set1P; apply: hx. Qed.
 
 Lemma cvg_to_superset A B x : A `<=` B ->
