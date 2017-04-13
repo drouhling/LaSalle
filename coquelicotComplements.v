@@ -316,6 +316,20 @@ rewrite [X in ball _ X]double_var.
 exact: ball_triangle qr_heps.
 Qed.
 
+Lemma closure_bigcap (F : set (set U)) :
+  closure (\bigcap_(A in F) A) `<=` \bigcap_(A in F) closure A.
+Proof.
+move=> p IFbarp A FA B /IFbarp [q [IFq Bq]].
+by exists q; split=> //; apply: IFq.
+Qed.
+
+Lemma closed_bigcap (F : set (set U)) :
+  (forall A, F A -> closed A) -> closed (\bigcap_(A in F) A).
+Proof.
+move=> clfamF; apply/closedP => p IFbarp A FA.
+by have /clfamF /closedP := FA; apply; apply: closure_bigcap FA.
+Qed.
+
 End Closedness.
 
 Lemma between_epsilon x y z :
