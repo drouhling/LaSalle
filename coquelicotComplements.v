@@ -153,25 +153,6 @@ Proof. by move=> sXZ sYZ a; apply: or_ind; [apply: sXZ|apply: sYZ]. Qed.
 Lemma setDE A (X Y : set A) : X `\` Y = X `&` ~` Y.
 Proof. by []. Qed.
 
-(* missing notation *)
-Definition normedModule_of (T : AbsRing) (_ : phantom Type (AbsRing.sort T)) :=
-  NormedModule T.
-Notation "{ 'normedModule' T }" := (@normedModule_of _ (Phantom Type T))
-  (at level 0, format "{ 'normedModule'  T }") : type_scope.
-
-(* frequent composition *)
-Lemma is_derive_shift K (V : NormedModule K) (f : K -> V) x l s :
-  is_derive f (plus x s) l -> is_derive (fun y => f (plus y s)) x l.
-Proof.
-move=> f'_plus.
-rewrite -[l]scal_one.
-apply: is_derive_comp=> //.
-rewrite -[one]plus_zero_r.
-apply: is_derive_plus.
-  exact: is_derive_id.
-exact: is_derive_const.
-Qed.
-
 Structure canonical_filter_on X Y := CanonicalFilterOn {
   canonical_filter_term : X;
   _ : set (set Y)
@@ -235,6 +216,25 @@ Definition cvg (U : UniformSpace) (F : set (set U)) : Prop :=
   exists l : U, F --> l.
 Notation "[ 'cvg' F ]" := (cvg [filter of F])
   (format "[ 'cvg'  F ]") : classical_set_scope.
+
+(* missing notation *)
+Definition normedModule_of (T : AbsRing) (_ : phantom Type (AbsRing.sort T)) :=
+  NormedModule T.
+Notation "{ 'normedModule' T }" := (@normedModule_of _ (Phantom Type T))
+  (at level 0, format "{ 'normedModule'  T }") : type_scope.
+
+(* frequent composition *)
+Lemma is_derive_shift K (V : NormedModule K) (f : K -> V) x l s :
+  is_derive f (plus x s) l -> is_derive (fun y => f (plus y s)) x l.
+Proof.
+move=> f'_plus.
+rewrite -[l]scal_one.
+apply: is_derive_comp=> //.
+rewrite -[one]plus_zero_r.
+apply: is_derive_plus.
+  exact: is_derive_id.
+exact: is_derive_const.
+Qed.
 
 Section Cvg_to_set.
 
@@ -390,13 +390,10 @@ Proof. done. Qed.
 
 Definition eqset (A B : set T) : Prop := forall p, p \ins A  <-> p \ins B.
 
-Definition include (A B : set T) := forall (p : T), p \ins A -> p \ins B.
-
 End Ensemble.
 
 Notation "p \ins A" := (in_set p A) (at level 3).
-Notation "A =s B" := (eqset A B) (at level 70, no associativity).
-Notation "A <s B" := (include A B) (at level 70, no associativity).
+Notation "A `=` B" := (eqset A B) (at level 70, no associativity).
 
 Section famille.
 
@@ -409,7 +406,7 @@ Structure family : Type := mkfamily  {
    }.
 
 Definition finite_set (T1 : Type) (A : set T1) :=
-  exists l : list T1, A =s (fun p => List.In p l).
+  exists l : list T1, A `=` (fun p => List.In p l).
 
 Structure finite_family := Ff {
    fam :> family;
@@ -427,49 +424,47 @@ Proof. by exists nil. Qed.
 Lemma finfamU (f g : finite_family) F :
   ffam (mkfamily (ind f `|` ind g) F).
 Proof.
-  have [l hl] := hfam f; have [l' hl'] := hfam g.
-  exists (l ++ l'); move=> j; apply: iff_trans; last apply iff_sym, in_app_iff.
-  apply: iff_trans; first exact/or_iff_compat_l/hl'.
-  exact/or_iff_compat_r/hl.
+have [l hl] := hfam f; have [l' hl'] := hfam g.
+exists (l ++ l'); move=> j; apply: iff_trans; last apply iff_sym, in_app_iff.
+apply: iff_trans; first exact/or_iff_compat_l/hl'.
+exact/or_iff_compat_r/hl.
 Qed.
 
 Lemma finfam_sing i F : ffam (mkfamily (eq^~ i) F).
 Proof.
-  exists (i :: nil).
-  move=> j; rewrite /in_set; split; first by move->; apply: in_eq.
-  by move/(@in_inv _ i j)=> hj; apply: or_ind hj.
+exists (i :: nil).
+move=> j; rewrite /in_set; split; first by move->; apply: in_eq.
+by move/(@in_inv _ i j)=> hj; apply: or_ind hj.
 Qed.
 
 Lemma finfam_ext (f : finite_family) F : ffam (mkfamily (ind f) F).
 Proof. by have [l] := finfam f; exists l. Qed.
 
-Definition inter_fam (f : family) (p : T) :=
-  forall i, i \ins (ind f) -> p \ins (f i).
+Definition inter_fam (f : family) := \bigcap_(i in ind f) f i.
 
-Definition union_fam (f : family) (p : T) :=
-  exists i, i \ins (ind f) /\ p \ins (f i).
+Definition union_fam (f : family) := \bigcup_(i in ind f) f i.
 
-Definition cover (A : set T) (f : family) := A <s union_fam f.
+Definition cover (A : set T) (f : family) := A `<=` union_fam f.
 
 Lemma cover_setI A (f g : family) :
-  ind g =s ind f -> (forall i, i \ins (ind f) -> f i =s A `&` (g i)) ->
+  ind g `=` ind f -> (forall i, i \ins (ind f) -> f i `=` A `&` g i) ->
   cover A f <-> cover A g.
 Proof.
-  move=> gieqfi fiAgi.
-  split.
-    move=> fcov p Ap.
-    have /fcov [j [fij fjp]] := Ap.
-    exists j; split; first exact/gieqfi.
-    apply: proj2.
-    exact/(fiAgi _ fij).
-  move=> gcov p Ap.
-  have /gcov [j [/gieqfi fij gjp]] := Ap.
-  exists j; split=> //.
-  exact/fiAgi.
+move=> gieqfi fiAgi.
+split.
+  move=> fcov p Ap.
+  have /fcov [j fij fjp] := Ap.
+  exists j; first exact/gieqfi.
+  apply: proj2.
+  exact/(fiAgi _ fij).
+move=> gcov p Ap.
+have /gcov [j /gieqfi fij gjp] := Ap.
+exists j => //.
+exact/fiAgi.
 Qed.
 
 Definition sub_family f g :=
-  ind g <s ind f /\ forall i, i \ins (ind g) -> f i =s g i.
+  ind g `<=` ind f /\ forall i, i \ins (ind g) -> f i `=` g i.
 
 Definition finite_inter (f : family) :=
   forall g : finite_family, sub_family f g -> inter_fam g !=set0.
@@ -479,20 +474,20 @@ Definition fixed (f : family) := inter_fam f !=set0.
 Lemma cover_setC A (f : family) :
   ~ fixed f -> cover A (mkfamily (ind f) (fun i => ~` f i)).
 Proof.
-  move=> /not_ex_all_not if0 p Ap.
-  have /not_all_ex_not [i] := if0 p.
-  move/(imply_to_and (i \ins (ind f)))=> [fii nfix].
-  by exists i.
+move=> /not_ex_all_not if0 p Ap.
+have /not_all_ex_not [i] := if0 p.
+move/(imply_to_and (i \ins (ind f)))=> [fii nfix].
+by exists i.
 Qed.
 
 Lemma nfixed_setC A p (f : family) :
   cover A f -> A p -> ~ fixed (mkfamily (ind f) (fun i => A `\` f i)).
 Proof.
-  move=> fcov Ap [q hq].
-  have /fcov [j [fij _]] := Ap.
-  have /hq [Aq _] := fij.
-  have /fcov [k [fik fkq]] := Aq.
-  by have /hq [_] := fik.
+move=> fcov Ap [q hq].
+have /fcov [j fij _] := Ap.
+have /hq [Aq _] := fij.
+have /fcov [k fik fkq] := Aq.
+by have /hq [_] := fik.
 Qed.
 
 End famille.
@@ -586,15 +581,15 @@ Definition quasi_compact (A : set U) :=
    exists g : finite_family U Ti, sub_family f g /\ cover A g.
 
 Definition closed_of_family A Ti (f : family U Ti) :=
-  exists g : family U Ti, closed_family g /\ ind g =s ind f /\
-  forall i, i \ins (ind f) -> f i =s A `&` (g i).
+  exists g : family U Ti, closed_family g /\ ind g `=` ind f /\
+  forall i, i \ins (ind f) -> f i `=` A `&` g i.
 
 Definition open_of_family A Ti (f : family U Ti) :=
-  exists g : family U Ti, open_family g /\ ind g =s ind f /\
-  forall i, i \ins (ind f) -> f i =s A `&` (g i).
+  exists g : family U Ti, open_family g /\ ind g `=` ind f /\
+  forall i, i \ins (ind f) -> f i `=` A `&` g i.
 
 Lemma closed_of_setC A Ti (f : family U Ti) : open_of_family A f ->
-  closed_of_family A (mkfamily (ind f) (fun i => A `&` ~` (f i))).
+  closed_of_family A (mkfamily (ind f) (fun i => A `\` f i)).
 Proof.
 move=> [g [opg [gieqfi hgi]]].
 exists (mkfamily (ind f) (fun i => ~` (g i))).
@@ -606,7 +601,7 @@ apply/ngjp; apply: proj2; exact/hgi.
 Qed.
 
 Lemma open_of_setC A Ti (f : family U Ti) : closed_of_family A f ->
-  open_of_family A (mkfamily (ind f) (fun i => A `&` ~` (f i))).
+  open_of_family A (mkfamily (ind f) (fun i => A `\` f i)).
 Proof.
 move=> [g [gclo [gieqfi hgi]]].
 exists (mkfamily (ind f) (fun i => ~` (g i))).
@@ -623,26 +618,26 @@ Lemma qcompact_set A :
   (forall Ti (f : family U Ti), open_of_family A f -> cover A f ->
     exists g : finite_family U Ti, sub_family f g /\ cover A g).
 Proof.
-  split.
-    move=> Aco Ti f [g [opg [gieqfi hgi]]] fcov.
-    have /Aco [] : cover A g by apply/(cover_setI gieqfi hgi).
-      by [].
-    move=> h [[shigi shg] hcov].
-    exists (Ff (finfam_ext h f)); split.
-      by split=> // j /shigi /gieqfi.
-    move=> p Ap.
-    have /hcov [j [hij hjp]] := Ap.
-    exists j; split=> //.
-    apply/hgi; first exact/gieqfi/shigi.
-    by split=> //; apply/shg.
-  move=> Aco Ti f opf fcov.
-  have /Aco [] : cover A (mkfamily (ind f) (fun i => A `&` (f i))).
-      by apply/cover_setI; last exact: fcov.
-    by exists f.
-  move=> g [[sgifAi sgfA] gcov].
-  exists (Ff (finfam_ext g f)); split=> // p Ap.
-  have /gcov [j [gij gjp]] := Ap.
-  by exists j; split=> //; apply: proj2; apply/sgfA.
+split.
+  move=> Aco Ti f [g [opg [gieqfi hgi]]] fcov.
+  have /Aco [] : cover A g by apply/(cover_setI gieqfi hgi).
+    by [].
+  move=> h [[shigi shg] hcov].
+  exists (Ff (finfam_ext h f)); split.
+    by split=> // j /shigi /gieqfi.
+  move=> p Ap.
+  have /hcov [j hij hjp] := Ap.
+  exists j => //.
+  apply/hgi; first exact/gieqfi/shigi.
+  by split=> //; apply/shg.
+move=> Aco Ti f opf fcov.
+have /Aco [] : cover A (mkfamily (ind f) (fun i => A `&` (f i))).
+    by apply/cover_setI; last exact: fcov.
+  by exists f.
+move=> g [[sgifAi sgfA] gcov].
+exists (Ff (finfam_ext g f)); split=> // p Ap.
+have /gcov [j gij gjp] := Ap.
+by exists j => //; apply: proj2; apply/sgfA.
 Qed.
 
 Lemma qcompact_fixed (A : set U) p :
@@ -651,82 +646,79 @@ Lemma qcompact_fixed (A : set U) p :
   (forall Ti (f : family U Ti), closed_of_family A f -> finite_inter f ->
     fixed f).
 Proof.
-  move=> Ap.
-  split.
-    move=> /qcompact_set Aco Ti f [g [gclo [gieqfi hgi]]].
-    suff : ~ fixed f -> exists g : finite_family U Ti,
-      sub_family f g /\ ~ fixed g.
-      move=> hf; apply: NNPP.
-      move/(imply_to_and (finite_inter _))=> [ffin] /hf [h [sfh Ih0]].
-      by apply: Ih0; have /ffin [q] := sfh; exists q.
-    move=> If0.
-    have /Aco [] : cover A (mkfamily (ind f) (fun i => A `&` ~` (f i))).
-        by apply/cover_setI; last apply: cover_setC If0.
-      by apply: open_of_setC; exists g.
-    move=> h [[/= sihif Anfieqhi] hcov].
-    exists (Ff (finfam_ext h (fun i => A `&` ~` (h i)))).
-    split; last exact: nfixed_setC Ap.
-    split=> //= j hij q; split.
-      move=> fjq; split; first by have /(hgi _ (sihif _ hij)) [] := fjq.
-      by move/Anfieqhi=> /(_ hij) [].
-    move=> [Aq /Anfieqhi] /(_ hij) /not_and_or /or_to_imply /(_ Aq).
-    exact: NNPP.
-  move=> hA.
-  apply/qcompact_set.
-  move=> Ti f [g [opg [gieqfi hgi]]] fcov.
-  apply: NNPP.
-  move/not_ex_all_not=> hf.
-  apply/(nfixed_setC fcov Ap)/hA; first by apply: closed_of_setC; exists g.
-  move=> h [shifi shnf].
-  have snhf : sub_family f (mkfamily (ind h) f) by [].
-  have /not_and_or /or_to_imply := hf (Ff (finfam_ext h f)).
-  move=> /(_ snhf) /not_all_ex_not [q] /(imply_to_and (A _)) [Aq].
-  move/not_ex_all_not=> /= hq.
-  exists q.
-  move=> j hij.
-  apply/shnf=> //; split=> //.
-  have /not_and_or /or_to_imply := hq j.
-  by move=> /(_ hij).
+move=> Ap.
+split.
+  move=> /qcompact_set Aco Ti f [g [gclo [gieqfi hgi]]].
+  suff : ~ fixed f -> exists g : finite_family U Ti,
+    sub_family f g /\ ~ fixed g.
+    move=> hf; apply: NNPP.
+    move/(imply_to_and (finite_inter _))=> [ffin] /hf [h [sfh Ih0]].
+    by apply: Ih0; have /ffin [q] := sfh; exists q.
+  move=> If0.
+  have /Aco [] : cover A (mkfamily (ind f) (fun i => A `&` ~` (f i))).
+      by apply/cover_setI; last apply: cover_setC If0.
+    by apply: open_of_setC; exists g.
+  move=> h [[/= sihif Anfieqhi] hcov].
+  exists (Ff (finfam_ext h (fun i => A `&` ~` (h i)))).
+  split; last exact: nfixed_setC Ap.
+  split=> //= j hij q; split.
+    move=> fjq; split; first by have /(hgi _ (sihif _ hij)) [] := fjq.
+    by move/Anfieqhi=> /(_ hij) [].
+  move=> [Aq /Anfieqhi] /(_ hij) /not_and_or /or_to_imply /(_ Aq).
+  exact: NNPP.
+move=> hA.
+apply/qcompact_set.
+move=> Ti f [g [opg [gieqfi hgi]]] fcov.
+apply: NNPP.
+move/not_ex_all_not=> hf.
+apply/(nfixed_setC fcov Ap)/hA; first by apply: closed_of_setC; exists g.
+move=> h [shifi shnf].
+have snhf : sub_family f (mkfamily (ind h) f) by [].
+have /not_and_or /or_to_imply := hf (Ff (finfam_ext h f)).
+move=> /(_ snhf) /not_all_ex_not [q] /(imply_to_and (A _)) [Aq hq].
+exists q => j hij.
+apply/shnf=> //; split=> // fij.
+apply: hq => /=.
+by exists j.
 Qed.
 
 Lemma fin_inter_filter Ti (f : family U Ti) :
   finite_inter f -> Filter (fun A => exists g : finite_family U Ti,
-    sub_family f g /\ subset (inter_fam g) A).
+    sub_family f g /\ inter_fam g `<=` A).
 Proof.
-  move=> ffin.
-  split.
-  - by exists (Ff (finfam_empty (fun _ _ => True))); split=> //; split.
-  - move=> A B [g [[sigif sgf] sigA]] [h [[sihif shf] sihB]].
-    exists (Ff (finfamU g h
-      (fun i p => (ind g i -> g i p) /\ (ind h i -> h i p)))); split=> /=.
-      split; first exact: subsetU.
-      move=> /= j kij p; split.
-        move=> fjp.
-        split; first by move/sgf=> eqgfj; apply/eqgfj.
-        by move/shf=> eqhfj; apply/eqhfj.
-      move=> [gp hp].
-      apply: or_ind kij.
-        move=> gij; apply/sgf=> //; exact: gp.
-      move=> hij; apply/shf=> //; exact: hp.
-    move=> p ikp; split.
-      apply: sigA; move=> j gij.
-      by have [/(_ gij)] := ikp j (or_introl (ind h j) gij).
-    apply: sihB; move=> j hij.
-    by have [_ /(_ hij)] := ikp j (or_intror (ind g j) hij).
-  - move=> A B sAB [g [sgf sigA]].
-    by exists g; split=> //; apply: subset_trans sAB.
+move=> ffin; split.
+- by exists (Ff (finfam_empty (fun _ _ => True))); split=> //; split.
+- move=> A B [g [[sigif sgf] sigA]] [h [[sihif shf] sihB]].
+  exists (Ff (finfamU g h
+    (fun i p => (ind g i -> g i p) /\ (ind h i -> h i p)))); split=> /=.
+    split; first exact: subsetU.
+    move=> /= j kij p; split.
+      move=> fjp.
+      split; first by move/sgf=> eqgfj; apply/eqgfj.
+      by move/shf=> eqhfj; apply/eqhfj.
+    move=> [gp hp].
+    apply: or_ind kij.
+      move=> gij; apply/sgf=> //; exact: gp.
+    move=> hij; apply/shf=> //; exact: hp.
+  move=> p ikp; split.
+    apply: sigA; move=> j gij.
+    by have [/(_ gij)] := ikp j (or_introl (ind h j) gij).
+  apply: sihB; move=> j hij.
+  by have [_ /(_ hij)] := ikp j (or_intror (ind g j) hij).
+- move=> A B sAB [g [sgf sigA]].
+  by exists g; split=> //; apply: subset_trans sAB.
 Qed.
 
 Lemma fin_inter_proper Ti (f : family U Ti) :
   finite_inter f -> ProperFilter (fun A => exists g : finite_family U Ti,
-    sub_family f g /\ subset (inter_fam g) A).
+    sub_family f g /\ inter_fam g `<=` A).
 Proof.
-  move=> ffin.
-  split; last exact: fin_inter_filter.
-  move=> A [g [sgf sigA]].
-  have /ffin [p igp] := sgf.
-  exists p.
-  exact: sigA.
+move=> ffin.
+split; last exact: fin_inter_filter.
+move=> A [g [sgf sigA]].
+have /ffin [p igp] := sgf.
+exists p.
+exact: sigA.
 Qed.
 
 Lemma compactP A : quasi_compact A <-> compact A.
@@ -773,20 +765,20 @@ End Compactness.
 
 Lemma Rhausdorff : hausdorff R_UniformSpace.
 Proof.
-  move=> x y hxy.
-  apply/Rle_le_eq/between_epsilon.
-  move=> eps.
-  apply/Rabs_le_between'.
-  set heps := pos_div_2 eps.
-  have [z []] := hxy _ _ (locally_ball x heps) (locally_ball y heps).
-  move/AbsRing_norm_compat2/Rlt_le; rewrite Rmult_1_l.
-  move=> hxz /AbsRing_norm_compat2/Rlt_le; rewrite Rmult_1_l abs_minus.
-  move=> hyz.
-  rewrite -[_ - _]/(@minus R_AbsRing _ _) (minus_trans z)
-          -[Rabs _]/(@abs R_AbsRing _).
-  apply: Rle_trans; first exact: abs_triangle.
-  rewrite [X in _ <= X]double_var.
-  exact: Rplus_le_compat.
+move=> x y hxy.
+apply/Rle_le_eq/between_epsilon.
+move=> eps.
+apply/Rabs_le_between'.
+set heps := pos_div_2 eps.
+have [z []] := hxy _ _ (locally_ball x heps) (locally_ball y heps).
+move/AbsRing_norm_compat2/Rlt_le; rewrite Rmult_1_l.
+move=> hxz /AbsRing_norm_compat2/Rlt_le; rewrite Rmult_1_l abs_minus.
+move=> hyz.
+rewrite -[_ - _]/(@minus R_AbsRing _ _) (minus_trans z)
+        -[Rabs _]/(@abs R_AbsRing _).
+apply: Rle_trans; first exact: abs_triangle.
+rewrite [X in _ <= X]double_var.
+exact: Rplus_le_compat.
 Qed.
 
 Definition is_bounded (K : AbsRing) (U : NormedModule K) (A : set U) :=
@@ -798,48 +790,48 @@ Definition maxn_list (l : list nat) m := fold_left maxn l m.
 
 Lemma dflt_le_maxn_list l m : (m <= maxn_list l m)%N.
 Proof.
-  elim: l m=> [|n l ihl m] //=.
-  apply: leq_trans; last exact: ihl.
-  exact: leq_maxl.
+elim: l m=> [|n l ihl m] //=.
+apply: leq_trans; last exact: ihl.
+exact: leq_maxl.
 Qed.
 
 Lemma le_maxn_list l m n : In n l -> (n <= maxn_list l m)%N.
 Proof.
-  elim: l m=> [|p l ihl m] //=.
-  apply: or_ind.
-    move<-.
-    apply: leq_trans; last exact: dflt_le_maxn_list.
-    exact: leq_maxr.
-  exact: ihl.
+elim: l m=> [|p l ihl m] //=.
+apply: or_ind.
+  move<-.
+  apply: leq_trans; last exact: dflt_le_maxn_list.
+  exact: leq_maxr.
+exact: ihl.
 Qed.
 
 Lemma compact_bounded (K : AbsRing) (U : NormedModule K) (A : set U) :
   compact A -> is_bounded A.
 Proof.
-  move/compactP=> Aco.
-  have covA : cover A (mkfamily (@setT nat) (fun n p => norm p < n)).
-    move=> p Ap.
-    have /nfloor_ex [n [_]] := norm_ge_0 p.
-    by rewrite -S_INR; exists n.+1.
-  have /Aco [] := covA.
-    move=> n _ p npltn.
-    have dltgt0 : 0 < (n - norm p) / (@norm_factor _ U).
-      by apply: Rdiv_lt_0_compat norm_factor_gt_0; apply: Rlt_Rminus.
-    exists (mkposreal _ dltgt0); move=> q /norm_compat2 /=.
-    rewrite -Rmult_assoc Rinv_r_simpl_m; last first.
-      exact/Rgt_not_eq/Rlt_gt/norm_factor_gt_0.
-    move=> hpq.
-    rewrite -[q]minus_zero_r (minus_trans p) minus_zero_r
-            -[_ n](Rplus_minus (norm p)) Rplus_comm.
-    apply: Rle_lt_trans; first exact: norm_triangle.
-    exact: Rplus_lt_compat_r.
-  move=> f [[sfi sf] fcov].
-  have [l fil] := finfam f.
-  exists (fold_left maxn l 0%N).
-  move=> p /fcov [n [fin]] /sf /= /(_ fin) npltn.
-  apply: Rlt_le_trans; first exact: npltn.
-  apply/le_INR/leP.
-  by move/fil: fin; apply: le_maxn_list.
+move/compactP=> Aco.
+have covA : cover A (mkfamily (@setT nat) (fun n p => norm p < n)).
+  move=> p Ap.
+  have /nfloor_ex [n [_]] := norm_ge_0 p.
+  by rewrite -S_INR; exists n.+1.
+have /Aco [] := covA.
+  move=> n _ p npltn.
+  have dltgt0 : 0 < (n - norm p) / (@norm_factor _ U).
+    by apply: Rdiv_lt_0_compat norm_factor_gt_0; apply: Rlt_Rminus.
+  exists (mkposreal _ dltgt0); move=> q /norm_compat2 /=.
+  rewrite -Rmult_assoc Rinv_r_simpl_m; last first.
+    exact/Rgt_not_eq/Rlt_gt/norm_factor_gt_0.
+  move=> hpq.
+  rewrite -[q]minus_zero_r (minus_trans p) minus_zero_r
+          -[_ n](Rplus_minus (norm p)) Rplus_comm.
+  apply: Rle_lt_trans; first exact: norm_triangle.
+  exact: Rplus_lt_compat_r.
+move=> f [[sfi sf] fcov].
+have [l fil] := finfam f.
+exists (fold_left maxn l 0%N).
+move=> p /fcov [n fin] /sf /= /(_ fin) npltn.
+apply: Rlt_le_trans; first exact: npltn.
+apply/le_INR/leP.
+by move/fil: fin; apply: le_maxn_list.
 Qed.
 
 Section Continuity.
@@ -853,33 +845,32 @@ Proof. by move=> xcontp locxpA; apply: xcontp locxpA. Qed.
 Lemma continuous_compact (x : T -> U) A :
   continuous_on A x -> compact A -> compact (x @` A).
 Proof.
-  move=> xcont compactA F FxA Fproper.
-  set G := [set B | exists C, F C /\ A `&` x @^-1` C `<=` B].
-  have Gproper : ProperFilter G.
-    split.
-      move=> B [C [FC hC]].
-      have [q [[p Ap <-] Cq]]: x @` A `&` C !=set0.
-        apply: filter_ex; exact: filter_and.
-      exists p; exact: hC.
-    split.
-    - by exists (x @` A).
-    - move=> B1 B2 [C1 [FC1 hC1]] [C2 [FC2 hC2]].
-      exists (setI C1 C2).
-      split; first by exact: filter_and.
-      move=> p [Ap [C1xp C2xp]].
-      split; [exact: hC1 | exact: hC2].
-    - move=> B B' subBB' [C [FC hC]].
-      exists C; split=> //.
-      exact: subset_trans subBB'.
-  case: (compactA _ _ Gproper); first by exists (x @` A); split=> // ? [].
-  move=> p [Ap hp].
-  exists (x p).
-  split; first by apply/imageP.
-  move=> B C hB hC.
-  move/xcont: hC=> /(_ Ap) hpC.
-  have : G (A `&` x @^-1` B) by exists B; split.
-  move/hp=> /(_ _ hpC) [q [[Aq Bxq]]] /(_ Aq).
-  by exists (x q).
+move=> xcont compactA F FxA Fproper.
+set G := [set B | exists2 C, F C & A `&` x @^-1` C `<=` B].
+have Gproper : ProperFilter G.
+  split.
+    move=> B [C FC hC].
+    have [q [[p Ap <-] Cq]]: x @` A `&` C !=set0.
+      apply: filter_ex; exact: filter_and.
+    exists p; exact: hC.
+  split.
+  - by exists (x @` A).
+  - move=> B1 B2 [C1 FC1 hC1] [C2 FC2 hC2].
+    exists (C1 `&` C2); first by exact: filter_and.
+    move=> p [Ap [C1xp C2xp]].
+    split; [exact: hC1 | exact: hC2].
+  - move=> B B' subBB' [C FC hC].
+    exists C => //.
+    exact: subset_trans subBB'.
+case: (compactA _ _ Gproper); first by exists (x @` A) => // ? [].
+move=> p [Ap hp].
+exists (x p).
+split; first by apply/imageP.
+move=> B C hB hC.
+move/xcont: hC=> /(_ Ap) hpC.
+have : G (A `&` x @^-1` B) by exists B.
+move/hp=> /(_ _ hpC) [q [[Aq Bxq]]] /(_ Aq).
+by exists (x q).
 Qed.
 
 End Continuity.
@@ -887,13 +878,13 @@ End Continuity.
 Lemma derive_ext_ge0 f g x :
   0 <= x -> (forall y, 0 <= y -> f y = g y) -> Derive f x = Derive g x.
 Proof.
-  move=> xge0 feqg.
-  rewrite /Derive /Lim.
-  apply/congr1/Lim_seq_ext_loc.
-  exists O=> n _.
-  rewrite !feqg // /Rbar_loc_seq Rplus_0_l.
-  apply: Rplus_le_le_0_compat=> //.
-  exact/Rlt_le/RinvN_pos.
+move=> xge0 feqg.
+rewrite /Derive /Lim.
+apply/congr1/Lim_seq_ext_loc.
+exists O=> n _.
+rewrite !feqg // /Rbar_loc_seq Rplus_0_l.
+apply: Rplus_le_le_0_compat=> //.
+exact/Rlt_le/RinvN_pos.
 Qed.
 
 Section Monotonicity.
@@ -902,46 +893,46 @@ Lemma ub_finlub (A : set R) :
   A !=set0 -> (exists M, A `<=` Rlt ^~ M) ->
   exists l, is_lub_Rbar A (Finite l).
 Proof.
-  move=> [p Ap] [M hM].
-  have lubAlub := Lub_Rbar_correct A.
-  have lubleM : Rbar_le (Lub_Rbar A) M.
-    apply: (proj2 lubAlub).
-    move=> q Aq /=.
-    exact/Rlt_le/hM.
-  case: (Lub_Rbar A) lubAlub lubleM=> //; first by move=> l; exists l.
-  by move=> [] hA; have := hA p Ap.
+move=> [p Ap] [M hM].
+have lubAlub := Lub_Rbar_correct A.
+have lubleM : Rbar_le (Lub_Rbar A) M.
+  apply: (proj2 lubAlub).
+  move=> q Aq /=.
+  exact/Rlt_le/hM.
+case: (Lub_Rbar A) lubAlub lubleM=> //; first by move=> l; exists l.
+by move=> [] hA; have := hA p Ap.
 Qed.
 
 Lemma ndecr_ub_cvg (f : R -> R) :
   (forall x y, 0 <= x <= y -> f x <= f y) ->
   (exists M, f @` Rle 0 `<=` Rlt^~ M) -> [cvg f @ +oo].
 Proof.
-  have fRn0 : f @` Rle 0 !=set0 by exists (f 0); apply/imageP/Rle_refl.
-  move=> fndecr /(ub_finlub fRn0) [l [ubl lubl]].
-  exists l=> A [eps heps].
-  suff [x [xge0 hx]] : exists x, 0 <= x /\ l - (f x) < eps.
-    exists x=> y ltxy.
-    apply: heps.
-    rewrite /ball /= /AbsRing_ball abs_minus /abs /= Rabs_pos_eq -?Rminus_le_0.
-      apply/(Rle_lt_trans _ _ _ _ hx)/Rplus_le_compat_l/Ropp_le_contravar.
-      by apply: fndecr; split=> //; apply: Rlt_le.
-    apply/ubl/imageP/Rlt_le.
-    exact: Rle_lt_trans ltxy.
-  apply: NNPP.
-  move/not_ex_all_not=> hf.
-  have : Rbar_le l (l - eps).
-    apply: lubl.
-    move=> _ [x xge0 <-] /=.
-    apply/Rle_minus_r.
-    rewrite Rplus_comm.
-    apply/Rle_minus_r/Rnot_lt_le.
-    have /not_and_or /or_to_imply := hf x.
-    by move=> /(_ xge0).
-  move/Rle_not_lt=> hleps.
-  apply/hleps/Rminus_lt.
-  rewrite /Rminus Rplus_comm -Rplus_assoc [- _ + _]Rplus_comm Rplus_opp_r
-          Rplus_0_l.
-  by apply: Ropp_lt_gt_0_contravar; case: eps heps hf hleps.
+have fRn0 : f @` Rle 0 !=set0 by exists (f 0); apply/imageP/Rle_refl.
+move=> fndecr /(ub_finlub fRn0) [l [ubl lubl]].
+exists l=> A [eps heps].
+suff [x [xge0 hx]] : exists x, 0 <= x /\ l - (f x) < eps.
+  exists x=> y ltxy.
+  apply: heps.
+  rewrite /ball /= /AbsRing_ball abs_minus /abs /= Rabs_pos_eq -?Rminus_le_0.
+    apply/(Rle_lt_trans _ _ _ _ hx)/Rplus_le_compat_l/Ropp_le_contravar.
+    by apply: fndecr; split=> //; apply: Rlt_le.
+  apply/ubl/imageP/Rlt_le.
+  exact: Rle_lt_trans ltxy.
+apply: NNPP.
+move/not_ex_all_not=> hf.
+have : Rbar_le l (l - eps).
+  apply: lubl.
+  move=> _ [x xge0 <-] /=.
+  apply/Rle_minus_r.
+  rewrite Rplus_comm.
+  apply/Rle_minus_r/Rnot_lt_le.
+  have /not_and_or /or_to_imply := hf x.
+  by move=> /(_ xge0).
+move/Rle_not_lt=> hleps.
+apply/hleps/Rminus_lt.
+rewrite /Rminus Rplus_comm -Rplus_assoc [- _ + _]Rplus_comm Rplus_opp_r
+        Rplus_0_l.
+by apply: Ropp_lt_gt_0_contravar; case: eps heps hf hleps.
 Qed.
 
 Lemma nincr_lb_cvg (f : R -> R) :
@@ -968,29 +959,29 @@ Lemma nincr_function_le (f : R -> R) (a b : Rbar) (df : R -> R) :
   (forall x : R, Rbar_le a x -> Rbar_le x b -> df x <= 0) ->
   forall x y : R, Rbar_le a x -> x <= y -> Rbar_le y b -> f y <= f x.
 Proof.
-  move=> Df dfle0 x y alex xley yleb.
-  apply/Rminus_le_0.
-  have hbet z : Rmin y x <= z -> z <= Rmax y x -> Rbar_le a z /\ Rbar_le z b.
-    move=> minlez zlemax.
-    split.
-      apply: Rbar_le_trans; first exact: alex.
-      apply: Rle_trans minlez.
-      by rewrite Rmin_right //; apply: Rle_refl.
-    apply: Rbar_le_trans yleb.
-    apply: Rle_trans; first exact: zlemax.
-    by rewrite Rmax_left //; apply: Rle_refl.
-  case: (MVT_gen f y x df).
-  - move=> z [/Rlt_le minlez /Rlt_le zlemax].
-    by apply: Df; have /hbet [] := zlemax.
-  - move=> z [minlez zlemax].
-    apply: derivable_continuous_pt.
-    exists (df z).
-    by apply/is_derive_Reals/Df; have /hbet [] := zlemax.
-  - move=> z [[minlez zlemax] ->].
-    rewrite -(Rmult_0_l (df z)) Rmult_comm.
-    apply: Rmult_le_compat_neg_l.
-      by apply: dfle0; have /hbet [] := zlemax.
-    exact: Rle_minus.
+move=> Df dfle0 x y alex xley yleb.
+apply/Rminus_le_0.
+have hbet z : Rmin y x <= z -> z <= Rmax y x -> Rbar_le a z /\ Rbar_le z b.
+  move=> minlez zlemax.
+  split.
+    apply: Rbar_le_trans; first exact: alex.
+    apply: Rle_trans minlez.
+    by rewrite Rmin_right //; apply: Rle_refl.
+  apply: Rbar_le_trans yleb.
+  apply: Rle_trans; first exact: zlemax.
+  by rewrite Rmax_left //; apply: Rle_refl.
+case: (MVT_gen f y x df).
+- move=> z [/Rlt_le minlez /Rlt_le zlemax].
+  by apply: Df; have /hbet [] := zlemax.
+- move=> z [minlez zlemax].
+  apply: derivable_continuous_pt.
+  exists (df z).
+  by apply/is_derive_Reals/Df; have /hbet [] := zlemax.
+- move=> z [[minlez zlemax] ->].
+  rewrite -(Rmult_0_l (df z)) Rmult_comm.
+  apply: Rmult_le_compat_neg_l.
+    by apply: dfle0; have /hbet [] := zlemax.
+  exact: Rle_minus.
 Qed.
 
 End Monotonicity.
