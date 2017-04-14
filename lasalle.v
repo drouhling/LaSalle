@@ -63,7 +63,7 @@ exact: plim_q.
 Qed.
 
 Lemma cvg_to_pos_limit_set x (A : set U) :
-  (x @ +oo) A -> compact A -> x @ +oo --> (cluster (x @ +oo) : set U).
+  (x @ +oo) A -> compact A -> x @ +oo --> cluster (x @ +oo).
 Proof.
 move=> xinftyA coA; apply: NNPP.
 case/not_all_ex_not=> B /(@imply_to_and (locally_set _ _)) [[eps plim_eps_B]].
@@ -154,7 +154,7 @@ Proof. by rewrite sol_shift. Qed.
 Lemma invariant_pos_limit_set p : is_invariant (cluster (sol p @ +oo)).
 Proof.
 move=> q plim_q t0 t0_ge0 A B [M solpMinfty_A] /sol_cont /plim_q q_Bsolt0.
-have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo) ((sol p) @` (Rlt M) `&` A).
+have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo) (sol p @` (Rlt M) `&` A).
   by exists M => t tgtM; split; [apply: imageP|apply: solpMinfty_A].
 rewrite -solD => Bsolpt0t; exists (sol p (t0 + t)); split=> //.
 by apply: solpMinfty_A; lra.
