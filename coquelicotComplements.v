@@ -299,8 +299,8 @@ Section Closedness.
 
 Variable (U : UniformSpace).
 
-Definition closure (A : set U) p :=
-  forall B, locally p B -> A `&` B !=set0.
+Definition closure (A : set U) :=
+  [set p | forall B, locally p B -> A `&` B !=set0].
 
 Instance within_locally_proper (A : set U) p :
   closure A p -> ProperFilter (within A (locally p)).
@@ -335,21 +335,66 @@ rewrite [X in ball _ X]double_var.
 exact: ball_triangle qr_heps.
 Qed.
 
-Lemma closure_bigcap (F : set (set U)) :
-  closure (\bigcap_(A in F) A) `<=` \bigcap_(A in F) closure A.
+Lemma closure_bigcap I (F : set I) (f : I -> set U) :
+  closure (\bigcap_(A in F) f A) `<=` \bigcap_(A in F) closure (f A).
 Proof.
 move=> p IFbarp A FA B /IFbarp [q [IFq Bq]].
 by exists q; split=> //; apply: IFq.
 Qed.
 
-Lemma closed_bigcap (F : set (set U)) :
-  (forall A, F A -> closed A) -> closed (\bigcap_(A in F) A).
+Lemma closed_bigcap I (F : set I) (f : I -> set U) :
+  (forall A, F A -> closed (f A)) -> closed (\bigcap_(A in F) f A).
 Proof.
-move=> clfamF; apply/closedP => p IFbarp A FA.
-by have /clfamF /closedP := FA; apply; apply: closure_bigcap FA.
+move=> clfamF; apply/closedP => p /closure_bigcap clFp A FA.
+by apply: closure_subset; [exact: clfamF|exact: clFp].
 Qed.
 
 End Closedness.
+
+Section Openness.
+
+Variable (U : UniformSpace).
+
+Definition interior (A : set U) :=
+  \bigcup_(V in open `&` (@subset _)^~ A) V.
+
+Notation "A ^°" := (interior A) (at level 1, format "A ^°").
+
+Lemma interior_subset (A : set U) : A^° `<=` A.
+Proof. by move=> p [B [_]]; apply. Qed.
+
+Lemma openP (A : set U) : open A <-> A `<=` A^°.
+Proof.
+split; first by move=> Aopen p Ap; exists A => //; split.
+move=> sub_Aint p /sub_Aint [B [Bopen BA /Bopen [eps Beps]]].
+by exists eps => y py_eps; apply: BA; apply: Beps.
+Qed.
+
+Lemma subset_interior (A : set U) : open A -> A `<=` A^°.
+Proof. by move/openP. Qed.
+
+Lemma open_interior (A : set U) : open A^°.
+Proof.
+move=> p [B [Bopen BA /Bopen [eps py_eps]]].
+exists eps => y py_eps2; exists B; first by split.
+by apply: py_eps.
+Qed.
+
+Lemma interior_bigcup I (F : set I) (f : I -> set U) :
+  \bigcup_(A in F) (f A)^° `<=` (\bigcup_(A in F) f A)^°.
+Proof.
+move=> p [B FB [V [Vopen VB pV]]]; exists V=> //; split=> // q qV.
+by exists B => //; apply: VB.
+Qed.
+
+Lemma open_bigcup I (F : set I) (f : I -> set U) :
+  (forall A, F A -> open (f A)) -> open (\bigcup_(A in F) f A).
+Proof.
+move=> opfamF; apply/openP => p [i Fi fip]; apply: interior_bigcup.
+by exists i => //; apply: subset_interior => //; apply: opfamF.
+Qed.
+
+End Openness.
 
 Lemma between_epsilon x y z :
   (forall eps : posreal, x - eps <= y <= z + eps) -> x <= y <= z.
