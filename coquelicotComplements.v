@@ -525,14 +525,11 @@ move/(imply_to_and (i \ins (ind f)))=> [fii nfix].
 by exists i.
 Qed.
 
-Lemma nfixed_setC A p (f : family) :
-  cover A f -> A p -> ~ fixed (mkfamily (ind f) (fun i => A `\` f i)).
+Lemma nfixed_setC A (f : family) j : ind f j ->
+  cover A f -> ~ fixed (mkfamily (ind f) (fun i => A `\` f i)).
 Proof.
-move=> fcov Ap [q hq].
-have /fcov [j fij _] := Ap.
-have /hq [Aq _] := fij.
-have /fcov [k fik fkq] := Aq.
-by have /hq [_] := fik.
+move=> fij fcov [q AnfIq]; have /AnfIq [Aq _] := fij.
+by have /fcov [k fik fkq] := Aq; have /AnfIq [] := fik.
 Qed.
 
 End famille.
@@ -658,73 +655,86 @@ apply/ngjp; apply: proj2; exact/hgi.
 Qed.
 (* *)
 
-Lemma qcompact_set A :
-  quasi_compact A <->
-  (forall Ti (f : family U Ti), open_of_family A f -> cover A f ->
-    exists g : finite_family U Ti, sub_family f g /\ cover A g).
+Lemma qcompactE A :
+  quasi_compact A <-> forall Ti (f : family U Ti) (j : Ti), ind f j ->
+    open_family f -> cover A f -> exists (g : finite_family U Ti) (k : Ti),
+    ind g k /\ sub_family f g /\ cover A g.
 Proof.
-split.
-  move=> Aco Ti f [g [opg [gieqfi hgi]]] fcov.
-  have /Aco [] : cover A g by apply/(cover_setI gieqfi hgi).
-    by [].
-  move=> h [[shigi shg] hcov].
-  exists (Ff (finfam_ext h f)); split.
-    by split=> // j /shigi /gieqfi.
-  move=> p Ap.
-  have /hcov [j hij hjp] := Ap.
-  exists j => //.
-  apply/hgi; first exact/gieqfi/shigi.
-  by split=> //; apply/shg.
-move=> Aco Ti f opf fcov.
-have /Aco [] : cover A (mkfamily (ind f) (fun i => A `&` (f i))).
-    by apply/cover_setI; last exact: fcov.
-  by exists f.
-move=> g [[sgifAi sgfA] gcov].
-exists (Ff (finfam_ext g f)); split=> // p Ap.
-have /gcov [j gij gjp] := Ap.
-by exists j => //; apply: proj2; apply/sgfA.
+split=> [coA Ti f j fij|coA Ti f] opf covf.
+  have [g [[ind_sgf fieqgi] gcov]] := coA _ _ opf covf.
+  exists (Ff (finfamU g (Ff (finfam_sing j (F f))) (F f))); exists j => /=.
+  split; first by right.
+  split; first by split=> // k; apply: or_ind => [|->] //; apply: ind_sgf.
+  by move=> p /gcov [k gik /(fieqgi _ gik) gkp]; exists k => //; left.
+apply: or_ind (classic (ind f !=set0)).
+  by move=> [j fij]; have [g [_ [_ []]]] := coA _ _ _ fij opf covf; exists g.
+move=> /not_ex_all_not ind_f0.
+have finf : ffam f by exists nil; move=> j; split; [move/ind_f0|].
+by exists (Ff finf); split=> //; split.
 Qed.
 
-Lemma qcompact_fixed (A : set U) p :
-  A p ->
+Lemma qcompact_set A :
   quasi_compact A <->
-  (forall Ti (f : family U Ti), closed_of_family A f -> finite_inter f ->
-    fixed f).
+  (forall Ti (f : family U Ti) (j : Ti), ind f j -> open_of_family A f ->
+    cover A f -> exists (g : finite_family U Ti) (k : Ti),
+    ind g k /\ sub_family f g /\ cover A g).
 Proof.
-move=> Ap.
-split.
-  move=> /qcompact_set Aco Ti f [g [gclo [gieqfi hgi]]].
+apply: iff_trans (qcompactE A) _.
+split=> [coA Ti f j fij [g [opg [ind_geqf fieqAgi]]]|coA Ti f j fij opf] fcov.
+  have gcov : cover A g by apply/(cover_setI ind_geqf fieqAgi).
+  have gij : ind g j by apply/ind_geqf.
+  have [h [k [hik [[ind_shg gieqhi] hcov]]]] := coA _ _ _ gij opg gcov.
+  exists (Ff (finfam_ext h f)); exists k; split=> //=.
+  split; first by split=> // l /ind_shg /ind_geqf.
+  move=> p Ap; have /hcov [l hil hlp] := Ap; exists l=> //=.
+  apply/fieqAgi; first exact/ind_geqf/ind_shg.
+  by split=> //; apply/gieqhi.
+have Afcov : cover A (mkfamily (ind f) (fun i => A `&` f i)).
+  by apply/cover_setI; last exact: fcov.
+have opAf : open_of_family A (mkfamily (ind f) (fun i => A `&` f i)).
+  by exists f.
+have /(_ fij) [g [k [gik [[ind_sgAf Afieqgi] gcov]]]] := coA _ _ j _ opAf Afcov.
+exists (Ff (finfam_ext g f)); exists k; split=> //=; split=> // p Ap.
+by have /gcov [l gil /(Afieqgi _ gil) []] := Ap; exists l.
+Qed.
+
+Lemma qcompact_fixed (A : set U) :
+  quasi_compact A <->
+  (forall Ti (f : family U Ti) (j : Ti), ind f j -> closed_of_family A f ->
+    finite_inter f -> fixed f).
+Proof.
+apply: iff_trans (qcompact_set A) _.
+split=> [coA Ti f j fij clf|fixA Ti f j fij opf fcov].
   suff : ~ fixed f -> exists g : finite_family U Ti,
     sub_family f g /\ ~ fixed g.
-    move=> hf; apply: NNPP.
-    move/(imply_to_and (finite_inter _))=> [ffin] /hf [h [sfh Ih0]].
-    by apply: Ih0; have /ffin [q] := sfh; exists q.
+    move=> contra; apply: NNPP.
+    move/(imply_to_and (finite_inter _))=> [finIf] /contra [h [sfh Ih0]].
+    by apply: Ih0; have /finIf [q] := sfh; exists q.
   move=> If0.
-  have /Aco [] : cover A (mkfamily (ind f) (fun i => A `&` ~` (f i))).
-      by apply/cover_setI; last apply: cover_setC If0.
-    by apply: open_of_setC; exists g.
-  move=> h [[/= sihif Anfieqhi] hcov].
-  exists (Ff (finfam_ext h (fun i => A `&` ~` (h i)))).
-  split; last exact: nfixed_setC Ap.
-  split=> //= j hij q; split.
-    move=> fjq; split; first by have /(hgi _ (sihif _ hij)) [] := fjq.
-    by move/Anfieqhi=> /(_ hij) [].
-  move=> [Aq /Anfieqhi] /(_ hij) /not_and_or /or_to_imply /(_ Aq).
+  have Anfcov : cover A (mkfamily (ind f) (fun i => A `\` (f i))).
+    by apply/cover_setI; last apply: cover_setC If0.
+  have /open_of_setC opAnf := clf.
+  have /(_ fij) := coA _ _ j _ opAnf Anfcov.
+  move=> [g [k [gik [[ind_sgAnf Anfieqgi] gcov]]]].
+  exists (Ff (finfam_ext g (fun i => A `&` ~` g i))).
+  split; last exact: nfixed_setC gik gcov.
+  split=> //= l gil q; split.
+    move=> flq; split; last by move=> /Anfieqgi - /(_ gil) [].
+    have fil : ind f l by apply/ind_sgAnf.
+    have [h [_ [_ fieqAhi]]] := clf.
+    by have /fieqAhi /(_ q) /proj1 /(_ flq) [] := fil.
+  move=> [Aq /Anfieqgi] /(_ gil) /not_and_or /or_to_imply /(_ Aq).
   exact: NNPP.
-move=> hA.
-apply/qcompact_set.
-move=> Ti f [g [opg [gieqfi hgi]]] fcov.
-apply: NNPP.
-move/not_ex_all_not=> hf.
-apply/(nfixed_setC fcov Ap)/hA; first by apply: closed_of_setC; exists g.
-move=> h [shifi shnf].
-have snhf : sub_family f (mkfamily (ind h) f) by [].
-have /not_and_or /or_to_imply := hf (Ff (finfam_ext h f)).
-move=> /(_ snhf) /not_all_ex_not [q] /(imply_to_and (A _)) [Aq hq].
-exists q => j hij.
-apply/shnf=> //; split=> // fij.
-apply: hq => /=.
-by exists j.
+apply: NNPP; move/not_ex_all_not=> sfncov; apply/(nfixed_setC fij fcov).
+apply: (fixA _ _ j) (closed_of_setC opf) _; first exact: fij.
+move=> h [ind_shf Anfieqhi].
+have shf : sub_family f (mkfamily (ind h `|` eq^~ j) f).
+  by split=> //= k; apply: or_ind => [|->] //; apply: ind_shf.
+have /= := sfncov (Ff (finfamU h (Ff (finfam_sing j (F f))) (F f))).
+move=> /not_ex_all_not /(_ j) /not_and_or /or_to_imply /(_ (or_intror _)).
+move=> /(_ eq_refl) /not_and_or /or_to_imply /(_ shf).
+move=> /not_all_ex_not [q] /(imply_to_and (A _)) [Aq hq]; exists q => k hik.
+by apply/Anfieqhi => //; split=> // fkq; apply: hq; exists k=> //; left.
 Qed.
 
 Lemma fin_inter_filter Ti (f : family U Ti) :
@@ -766,44 +776,35 @@ exists p.
 exact: sigA.
 Qed.
 
-Lemma compactP A : quasi_compact A <-> compact A.
+Lemma compact_fixed A :
+  compact A <-> forall Ti (f : family U Ti) (j : Ti), ind f j ->
+  closed_of_family A f -> finite_inter f -> fixed f.
 Proof.
-apply: or_ind (classic (nonempty A)); last first.
-  move/not_ex_all_not=> A0.
-  split.
-    by move=> Aco F FA Fproper; have /filter_ex [? /A0] := FA.
-  move=> Aco Ti f opf fcov.
-  exists (Ff (finfam_empty f)); split; first by split.
-  by move=> ? /A0.
-move=> [p Ap]; split.
-  move/(qcompact_fixed Ap)=> Aco F FA Fproper.
-  have hF : finite_inter (mkfamily F (fun P => A `&` closure P)).
-    apply: filter_finite_inter.
-    move=> P FP; apply: filter_and=> //.
-    by apply: filter_imp; first exact: subset_closure.
-  have /Aco [] := hF.
-    exists (mkfamily F (fun P => closure P)); split=> // P FP.
-    exact: closed_closure.
-  move=> q hq; exists q; split.
-    by apply: proj1; apply: hq FA.
-  by move=> B C FB hC; have /hq [_] := FB; move=> /(_ _ hC).
-move=> Aco; apply/(qcompact_fixed Ap).
-move=> Ti f [g [gclo [gieqfi hgi]]] ffin.
-apply: or_ind (classic (nonempty (ind f))); last first.
-  by move/not_ex_all_not=> fi0; exists p; move=> i /fi0.
-move=> [j fij].
-have sffam i B : ind f i -> subset (f i) B -> exists g : finite_family U Ti,
-  sub_family f g /\ subset (inter_fam g) B.
-  move=> fii sfiB; exists (Ff (finfam_sing i f)); split.
-    by split=> // k ->.
-  by move=> q hq; apply/sfiB/hq.
-have [] := Aco _ _ (fin_inter_proper ffin).
-  by apply: (sffam _ _ fij); move=> q /(hgi _ fij) [].
-move=> q [Aq hq]; exists q; move=> i fi.
-apply/hgi=> //; split=> //.
-apply: (@closure_subset _ (g i)); first exact/gclo/gieqfi.
-move=> B hB; apply: hq hB.
-by apply: (sffam _ _ fi); move=> r /(hgi _ fi) [].
+split=> [coA Ti f j fij [g [clg [ind_geqf fieqAgi]]] finIf|fixA F FA Fproper].
+  have sffam k B : ind f k -> subset (f k) B -> exists g : finite_family U Ti,
+    sub_family f g /\ subset (inter_fam g) B.
+    move=> fik sfkB; exists (Ff (finfam_sing k f)); split.
+      by split=> // ? ->.
+    by move=> p fkp; apply/sfkB/fkp.
+  have [|p [Ap clfinIfp]] := coA _ _ (fin_inter_proper finIf).
+    by apply: (sffam _ _ fij); move=> p /(fieqAgi _ fij) [].
+  exists p => k fik; apply/(fieqAgi _ fik); split=> //.
+  apply: closure_subset; first exact/clg/ind_geqf.
+  move=> B pB; apply: clfinIfp pB.
+  by apply: (sffam _ _ fik); move=> q /(fieqAgi _ fik) [].
+have finIAclF : finite_inter (mkfamily F (fun B => A `&` closure B)).
+  apply: filter_finite_inter => B FB; apply: filter_and=> //.
+  exact: filter_imp (@subset_closure _ B) _.
+have /(_ FA) [|p AclFIp] := fixA _ _ A _ _ finIAclF.
+  exists (mkfamily F (fun B => closure B)); split=> // B FB.
+  exact: closed_closure.
+exists p; split=> [|B C FB pC]; first by have /AclFIp [] := FA.
+by have /AclFIp [_] := FB; move=> /(_ _ pC).
+Qed.
+
+Lemma compactP A : compact A <-> quasi_compact A.
+Proof.
+by apply: iff_trans (compact_fixed A) _; apply: iff_sym; apply: qcompact_fixed.
 Qed.
 
 End Compactness.
