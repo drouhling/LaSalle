@@ -355,37 +355,29 @@ Section Openness.
 
 Variable (U : UniformSpace).
 
-Definition interior (A : set U) :=
-  \bigcup_(V in open `&` (@subset _)^~ A) V.
+Definition interior (A : set U) := locally^~ A.
 
 Notation "A ^°" := (interior A) (at level 1, format "A ^°").
 
 Lemma interior_subset (A : set U) : A^° `<=` A.
-Proof. by move=> p [B [_]]; apply. Qed.
+Proof. by move=> ? [?]; apply; apply: ball_center. Qed.
 
 Lemma openP (A : set U) : open A <-> A `<=` A^°.
-Proof.
-split; first by move=> Aopen p Ap; exists A => //; split.
-move=> sub_Aint p /sub_Aint [B [Bopen BA /Bopen [eps Beps]]].
-by exists eps => y py_eps; apply: BA; apply: Beps.
-Qed.
+Proof. by split=> opA ? /opA. Qed.
 
 Lemma subset_interior (A : set U) : open A -> A `<=` A^°.
 Proof. by move/openP. Qed.
 
 Lemma open_interior (A : set U) : open A^°.
 Proof.
-move=> p [B [Bopen BA /Bopen [eps py_eps]]].
-exists eps => y py_eps2; exists B; first by split.
-by apply: py_eps.
+move=> p [eps peps_A]; exists (pos_div_2 eps) => q pheps_q.
+exists (pos_div_2 eps) => r qheps_r.
+by apply: peps_A; rewrite [_ eps]double_var; apply: ball_triangle qheps_r.
 Qed.
 
 Lemma interior_bigcup I (F : set I) (f : I -> set U) :
   \bigcup_(A in F) (f A)^° `<=` (\bigcup_(A in F) f A)^°.
-Proof.
-move=> p [B FB [V [Vopen VB pV]]]; exists V=> //; split=> // q qV.
-by exists B => //; apply: VB.
-Qed.
+Proof. by move=> p [B ? [eps peps_fB]]; exists eps => q /peps_fB; exists B. Qed.
 
 Lemma open_bigcup I (F : set I) (f : I -> set U) :
   (forall A, F A -> open (f A)) -> open (\bigcup_(A in F) f A).
