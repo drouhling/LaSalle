@@ -118,6 +118,36 @@ Notation "f @^-1` A" := (preimage f A) (at level 24) : classical_set_scope.
 Notation "f @` A" := (image f A) (at level 24) : classical_set_scope.
 Notation "A !=set0" := (nonempty A) (at level 80) : classical_set_scope.
 
+Lemma setIC A (X Y : set A) : X `&` Y = Y `&` X.
+Proof. by apply/funext => ?; apply/propext; apply: and_comm. Qed.
+
+Lemma empty_setI A (X Y : set A) : X = set0 -> X `&` Y = set0.
+Proof.
+by move=> X0; apply/funext => a; apply/propext; split=> // - []; rewrite X0.
+Qed.
+
+Lemma bigcap_setI A I (F : set I) (f : I -> set A) (X : set A) i :
+  F i -> \bigcap_(i in F) f i `&` X = \bigcap_(i in F) (f i `&` X).
+Proof.
+move=> Fi; apply/funext => a; apply/propext; split.
+  by move=> [Ifa Xa] j Fj; split=> //; apply: Ifa.
+move=> IfIXa; split; [by move=> j /IfIXa []|by have /IfIXa [] := Fi].
+Qed.
+
+Lemma setI_bigcap A I (F : set I) (f : I -> set A) (X : set A) i :
+  F i -> X `&` \bigcap_(i in F) f i = \bigcap_(i in F) (X `&` f i).
+Proof.
+move=> Fi; rewrite setIC (bigcap_setI _ _ Fi).
+by apply/funext => a; apply/propext; split=> IfIXa j /IfIXa; rewrite setIC.
+Qed.
+
+Lemma setDE A (X Y : set A) : X `\` Y = X `&` ~` Y.
+Proof. by []. Qed.
+
+Lemma bigcap_setD A I (F : set I) (f : I -> set A) (X : set A) i :
+  F i -> \bigcap_(i in F) f i `\` X = \bigcap_(i in F) (f i `\` X).
+Proof. by move=> Fi; rewrite setDE (bigcap_setI _ _ Fi). Qed.
+
 Lemma imageP A B (f : A -> B) (X : set A) a : X a -> (f @` X) (f a).
 Proof. by exists a. Qed.
 
@@ -150,8 +180,17 @@ Proof. by move=> sXY ? nYa ?; apply/nYa/sXY. Qed.
 Lemma subsetU A (X Y Z : set A) : X `<=` Z -> Y `<=` Z -> X `|` Y `<=` Z.
 Proof. by move=> sXZ sYZ a; apply: or_ind; [apply: sXZ|apply: sYZ]. Qed.
 
-Lemma setDE A (X Y : set A) : X `\` Y = X `&` ~` Y.
-Proof. by []. Qed.
+Lemma subset_Dempty A (X Y : set A) : X `<=` Y -> X `\` Y = set0.
+Proof.
+move=> sXY; apply/funext => a; apply/propext; split=> // - [Xa].
+by apply; apply/sXY.
+Qed.
+
+Lemma Dempty_subset A (X Y : set A) : X `\` Y = set0 -> X `<=` Y.
+Proof.
+move=> XDY0 a Xa; apply: NNPP=> /(conj Xa).
+by rewrite -[_ /\ _]/((_ `\` _) _) XDY0.
+Qed.
 
 Structure canonical_filter_on X Y := CanonicalFilterOn {
   canonical_filter_term : X;
