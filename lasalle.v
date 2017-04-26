@@ -65,19 +65,26 @@ Qed.
 Lemma cvg_to_pos_limit_set x (A : set U) :
   (x @ +oo) A -> compact A -> x @ +oo --> cluster (x @ +oo).
 Proof.
-move=> xinftyA coA; apply: NNPP.
-case/not_all_ex_not=> B /(@imply_to_and (locally_set _ _)) [[eps plim_eps_B]].
-move=> /not_ex_all_not nxinftyB.
-suff : ~` B `&` B !=set0 by case=> ? [].
-have proper_within_setC_B : ProperFilter (within (~` B) (x @ +oo)).
-  split=> [C [T snBxCxT]|]; last exact: within_filter.
-  case /not_all_ex_not : (nxinftyB T) => t /(@imply_to_and (T < t)) [tgtT nBxt].
-  by exists (x t); exact: snBxCxT.
-case: (coA _ _ proper_within_setC_B); first by exact: filter_le_within.
-move=> p [Ap plimnBp]; apply plimnBp; first by exists (mkposreal _ Rlt_0_1).
-exists eps=> q hq; apply: plim_eps_B; exists p => // C D xinftyC pD.
-by apply: plimnBp pD; apply: filter_le_within.
+move=> xinftyA coA B [eps sclepsB].
+by apply: filter_imp sclepsB _; apply: filter_cluster coA eps.
 Qed.
+
+(* Lemma cvg_to_pos_limit_set x (A : set U) : *)
+(*   (x @ +oo) A -> compact A -> x @ +oo --> cluster (x @ +oo). *)
+(* Proof. *)
+(* move=> xinftyA coA; apply: NNPP. *)
+(* case/not_all_ex_not=> B /(@imply_to_and (locally_set _ _)) [[eps plim_eps_B]]. *)
+(* move=> /not_ex_all_not nxinftyB. *)
+(* suff : ~` B `&` B !=set0 by case=> ? []. *)
+(* have proper_within_setC_B : ProperFilter (within (~` B) (x @ +oo)). *)
+(*   split=> [C [T snBxCxT]|]; last exact: within_filter. *)
+(*   case /not_all_ex_not : (nxinftyB T) => t /(@imply_to_and (T < t)) [tgtT nBxt]. *)
+(*   by exists (x t); exact: snBxCxT. *)
+(* case: (coA _ _ proper_within_setC_B); first by exact: filter_le_within. *)
+(* move=> p [Ap plimnBp]; apply plimnBp; first by exists (mkposreal _ Rlt_0_1). *)
+(* exists eps=> q hq; apply: plim_eps_B; exists p => // C D xinftyC pD. *)
+(* by apply: plimnBp pD; apply: filter_le_within. *)
+(* Qed. *)
 
 Lemma sub_image_at_infty x (A : set U) : x @` Rle 0 `<=` A -> (x @ +oo) A.
 Proof. by move=> sxRpA; exists 0 => t tgt0; apply/sxRpA/imageP/Rlt_le. Qed.

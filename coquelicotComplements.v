@@ -566,28 +566,32 @@ Qed.
 End famille.
 (* *)
 
+Lemma filter_bigcap (U : UniformSpace) I (G : set I) (f : I -> set U)
+  (F : set (set U)) :
+  Filter F -> finite_set G -> (forall i, G i -> F (f i)) ->
+  F (\bigcap_(i in G) f i).
+Proof.
+move=> Ffilter [l Geql] sfGF.
+have himp : forall p, (forall i, In i l -> f i p) -> (\bigcap_(i in G) f i) p.
+  by move=> p hp i /Geql /hp.
+apply: filter_imp himp _.
+have {sfGF} : forall i, In i l -> F (f i) by move=> i /Geql; apply: sfGF.
+elim: l G Geql => [|a l ihl] G Geql sfGF; first exact: filter_imp filter_true.
+apply: (filter_imp (f a `&` [set p|forall i, In i l -> f i p])).
+  by move=> p [fap flp] i; apply: or_ind; [move<-|apply: flp].
+apply: filter_and; first by apply: sfGF; left.
+by apply: (ihl (In(A:=I)^~ l))=> // i li; apply: sfGF; right.
+Qed.
+
 Lemma filter_finite_inter (U : UniformSpace) (F : set (set U)) Ti
   (f : family U Ti) :
   ProperFilter F -> (forall i, i \ins (ind f) -> F (f i)) -> finite_inter f.
 Proof.
-  move=> Fproper sfF g hg; apply: filter_ex.
-  case: g hg=> /= g [l hl] [hiF hF].
-  have himp : forall p, (forall i, In i l -> g i p) -> inter_fam g p.
-    by move=> p hp j gij; apply/hp/hl.
-  apply: filter_imp; first exact: himp.
-  elim: l g hF hiF hl himp=> /= [g hF hiF hl himp|a l ihl g hF hiF hl himp].
-    exact: filter_imp filter_true.
-  apply: filter_imp; last apply: filter_and.
-      move=> p [h1p h2p] j.
-      apply: or_ind; first by move<-; exact: h1p.
-      move: j; exact: h2p.
-    apply: (filter_imp (f a)); first by move=> p /hF; apply; apply/hl; left.
-    by apply/sfF/hiF/hl; left.
-  apply: (ihl (mkfamily (fun j => In j l) g)).
-  - by move=> j hj; apply/hF/hl; right.
-  - by move=> j hj; apply/hiF/hl; right.
-  - by [].
-  - by move=> p hp j hj; apply/hp.
+move=> Fproper sfF g [ind_sgf gieqfi]; apply: filter_ex.
+suff : F (\bigcap_(i in ind g) f i).
+  apply: filter_imp => p If_indg_p j gij; apply/gieqfi => //.
+  exact: If_indg_p.
+by apply: filter_bigcap (hfam _) _ => i /ind_sgf; apply: sfF.
 Qed.
 
 Section Compactness.
@@ -836,6 +840,64 @@ Qed.
 Lemma compactP A : compact A <-> quasi_compact A.
 Proof.
 by apply: iff_trans (compact_fixed A) _; apply: iff_sym; apply: qcompact_fixed.
+Qed.
+
+Lemma fixed_compactP A :
+  (forall Ti (f : family U Ti) j, ind f j -> closed_of_family A f ->
+   finite_inter f -> fixed f) <->
+  forall I (F : set I) (f : I -> set U), F !=set0 -> (exists (g : I -> set U),
+    forall i, F i -> f i = A `&` g i /\ closed (g i)) ->
+    \bigcap_(i in F) f i = set0 -> exists (G : set I), finite_set G /\
+      G `<=` F /\ \bigcap_(i in G) f i = set0.
+Proof.
+split.
+  move=> coA I F f [j Fj] [g clAg] If0.
+  have clAf : closed_of_family A (mkfamily F f).
+    exists (mkfamily F g); split; first by move=> i /clAg [].
+    by split=> //= i /clAg [->].
+  have /(_ Fj) := coA _ _ j _ clAf.
+  move=> /(@Implies (finite_inter _)) /impliesPn nfixed_nfinI.
+  have /nfixed_nfinI /not_all_ex_not : ~ fixed (mkfamily F f).
+    by move=> [p Ifp]; rewrite -[False]/(set0 p) -If0.
+  move=> [h /(@imply_to_and _ (_ !=set0)) [[ind_shf hieqfi] Ih0]].
+  exists (ind h); split; first (exact: hfam); split=> //.
+  apply/funext => p; apply/propext; split=> // Ihfp; apply: Ih0.
+  by exists p => k hik; apply/hieqfi => //; apply: Ihfp.
+move=> coA Ti f j fij [g [clg [ind_geqf fieqAgi]]].
+apply: NNPP => /(@imply_to_and (finite_inter _)) [finIf nfixedf].
+have /coA : \bigcap_(i in ind f) f i = set0.
+  by apply/funext=> a; apply/propext; split=> // Ifa; apply: nfixedf; exists a.
+move=> []; first by exists j.
+  exists (F g) => k fik; split; last exact/clg/ind_geqf.
+  by apply/funext => a; apply/propext; move: a; apply: fieqAgi.
+move=> G [finG [sGindf IGf0]].
+have /finIf [p IGfp] : sub_family f (@Ff _ _ (mkfamily G f) finG) by [].
+by rewrite -[False]/(set0 p) -IGf0.
+Qed.
+
+Lemma filter_cluster (F : set (set U)) (A : set U) :
+  ProperFilter F -> F A -> compact A ->
+  forall eps : posreal, F (ball_set (cluster F) eps).
+Proof.
+move=> Fproper FA /compact_fixed /fixed_compactP coA eps.
+set B := ball_set (cluster F) eps.
+have /subset_Dempty /(empty_setI A) : cluster F `<=` interior B.
+  by move=> p clFp; exists eps => q peps_q; exists p.
+rewrite setIC clusterE (bigcap_setD _ _ FA) (setI_bigcap _ _ FA).
+move=> /coA [||G [finG [sGF clGnB0]]]; first by exists setT; apply: filter_true.
+  exists (fun C => closure C `\` interior B) => C FC; split=> //.
+  by apply: closed_and; [apply: closed_closure|apply/closed_not/open_interior].
+have [C GC] : G !=set0.
+  apply: NNPP => /not_ex_all_not G0; have /filter_ex [p _] := FA.
+  by rewrite -[False]/(set0 p) -clGnB0 => C /G0.
+move: clGnB0; have -> : \bigcap_(C in G) (A `&` (closure C `\` interior B)) =
+  \bigcap_(C in G) (A `&` closure C `\` interior B).
+  apply/funext => a; apply/propext.
+  by split=> [IclGa ? /IclGa [? []]|IclGa ? /IclGa [[]]].
+rewrite -(bigcap_setD _ _ GC) => /Dempty_subset sIclGintB.
+apply: filter_imp (@interior_subset _ B) _; apply: filter_imp sIclGintB _.
+apply: filter_bigcap finG _ => D GD; apply: filter_and FA _.
+by apply: filter_imp (@subset_closure _ D) _; apply: sGF.
 Qed.
 
 End Compactness.
