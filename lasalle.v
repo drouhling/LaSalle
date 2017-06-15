@@ -51,15 +51,9 @@ Lemma nonempty_pos_limit_set x (A : set U) :
   compact A -> (x @ +oo) A -> cluster (x @ +oo) !=set0.
 Proof. by move=> cA /cA [p []]; exists p. Qed.
 
-Lemma closed_pos_lim_set (x : R -> U) : closed (cluster (x @ +oo)).
+Lemma closed_pos_lim_set (x : R -> U) : is_closed (cluster (x @ +oo)).
 Proof.
-rewrite clusterE; set G := fun B => exists A, (x @ +oo) A /\ B = closure A.
-have clIG : closure (\bigcap_(B in G) B) `<=` \bigcap_(B in G) B.
-  by apply/closedP; apply:closed_bigcap => _ [? [_ ->]]; apply: closed_closure.
-apply/closedP => p plimbar_p A xinftyA.
-apply: clIG; last by exists A.
-move=> B /plimbar_p [q [plim_q Bq]]; exists q; split=> // _ [C [xinfty_C ->]].
-exact: plim_q.
+by rewrite clusterE; apply: is_closed_bigcap => ??; apply: is_closed_closure.
 Qed.
 
 Lemma cvg_to_pos_limit_set x (A : set U) :
@@ -95,9 +89,9 @@ Proof. by move=> sxRpA p xpp B /xpp; apply; apply: sub_image_at_infty. Qed.
 
 Lemma c0_cvg_cst_on_pos_lim_set A x (V : U -> R) (l : R) :
   continuous_on A V -> V \o x @ +oo --> l ->
-  closed A -> x @` Rle 0 `<=` A -> cluster (x @ +oo) `<=` V @^-1` [set l].
+  is_closed A -> x @` Rle 0 `<=` A -> cluster (x @ +oo) `<=` V @^-1` [set l].
 Proof.
-move=> Vcont Vxpl /closedP Acl sxRpA p plimp; apply: Rhausdorff.
+move=> Vcont Vxpl Acl sxRpA p plimp; apply: Rhausdorff.
 have Ap : A p by apply/Acl/(@sub_plim_clos_invar x).
 move=> B C /Vcont - /(_ Ap) VpAB /Vxpl VxpC.
 have : (x @ +oo) (A `&` (V @^-1` C)).
@@ -131,82 +125,95 @@ Section DifferentialSystem.
 Variable U : {normedModule R}.
 Variable X : U -> U.
 Variable hU : hausdorff U.
+Variable S : set U.
 
-Definition is_sol (x : R -> U) := forall t, is_derive x t (X (x t)).
+Definition is_sol (x : R -> U) := forall t, 0 <= t -> is_derive x t (X (x t)).
 
 Variable (sol : U -> R -> U).
 Hypothesis (sol0 : forall p, sol p 0 = p).
-Hypothesis solP : forall x, is_sol x <-> x = sol (x 0).
+Hypothesis solP : forall x, S (x 0) -> is_sol x <-> x = sol (x 0).
 
-Lemma sol_is_sol p : is_sol (sol p).
-Proof. by apply/solP; rewrite sol0. Qed.
+Lemma sol_is_sol p : S p -> is_sol (sol p).
+Proof. by move=> Sp; apply/solP; rewrite sol0. Qed.
 Hint Resolve sol_is_sol.
 
-Lemma uniq_sol x y : is_sol x -> is_sol y -> x 0 = y 0 -> x = y.
-Proof. by move=> /solP-> /solP->; rewrite !sol0 => ->. Qed.
+Lemma uniq_sol x y :
+  S (x 0) -> S (y 0) -> is_sol x -> is_sol y -> x 0 = y 0 -> x = y.
+Proof. by move=> Sx0 Sy0 /(solP Sx0)-> /(solP Sy0)->; rewrite !sol0 => ->. Qed.
 
 Definition is_invariant A := forall p, A p -> forall t, 0 <= t -> A (sol p t).
 
-Hypothesis (sol_cont : forall t, {all continuous (sol^~ t)}).
+Hypothesis Sinvar : is_invariant S.
 
-Lemma sol_shift p t0 : sol (sol p t0) = (fun t => sol p (t + t0)).
+Lemma sol_shift p t0 :
+  S p -> 0 <= t0 -> sol (sol p t0) = (fun t => sol p (t + t0)).
 Proof.
-apply: uniq_sol=> //; last by rewrite Rplus_0_l sol0.
-by move=> t; apply/is_derive_shift/sol_is_sol.
+move=> Sp t0ge0; apply: uniq_sol;
+  try apply: sol_is_sol; rewrite ?Rplus_0_l ?sol0 //; try exact: Sinvar.
+by move=> t tge0; apply/is_derive_shift/(sol_is_sol Sp)/Rplus_le_le_0_compat.
 Qed.
 
-Lemma solD p t0 t : sol p (t + t0) = sol (sol p t0) t.
-Proof. by rewrite sol_shift. Qed.
+Lemma solD p t0 t : S p -> 0 <= t0 -> sol p (t + t0) = sol (sol p t0) t.
+Proof. by move=> Sp t0ge0; rewrite sol_shift. Qed.
 
-Lemma invariant_pos_limit_set p : is_invariant (cluster (sol p @ +oo)).
+Hypothesis sol_cont : forall t, continuous_on (closure S) (sol^~ t).
+
+Lemma invariant_pos_limit_set p : S p -> is_invariant (cluster (sol p @ +oo)).
 Proof.
-move=> q plim_q t0 t0_ge0 A B [M solpMinfty_A] /sol_cont /plim_q q_Bsolt0.
+move=> Sp q plim_q t0 t0_ge0 A B [M].
+wlog Mge0 : M / 0 <= M => [sufMge0|] solpMinfty_A.
+  apply: (sufMge0 (Rmax 0 M)); first exact: Rmax_l.
+  by move=> x /Rmax_Rlt [_]; apply: solpMinfty_A.
+have Sbar_q : closure S q.
+  by move=> C; apply: plim_q; exists 0 => t /Rlt_le tge0; apply: Sinvar.
+move=> /(sol_cont Sbar_q) /plim_q q_Bsolt0.
 have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo) (sol p @` (Rlt M) `&` A).
   by exists M => t tgtM; split; [apply: imageP|apply: solpMinfty_A].
-rewrite -solD => Bsolpt0t; exists (sol p (t0 + t)); split=> //.
-by apply: solpMinfty_A; lra.
+have tge0 : 0 <= t by apply: Rlt_le; apply: Rle_lt_trans tgtM.
+have Sbar_solpt : closure S (sol p t) by apply/subset_closure/Sinvar.
+move=> /(_ Sbar_solpt); rewrite -solD // => Bsolpt0t; exists (sol p (t0 + t)).
+by split=> //; apply: solpMinfty_A; lra.
 Qed.
 
-Definition limS (S : set U) := \bigcup_(q in S) cluster (sol q @ +oo).
+Definition limS (K : set U) := \bigcup_(q in K) cluster (sol q @ +oo).
 
-Lemma invariant_limS S : is_invariant (limS S).
+Lemma invariant_limS K : K `<=` S -> is_invariant (limS K).
 Proof.
-move=> p [q Sq plimxp] t tge0.
-by exists q => //; exact: invariant_pos_limit_set.
+move=> sKS p [q Kq plimxp] t tge0.
+by exists q => //; apply: invariant_pos_limit_set => //; apply: sKS.
 Qed.
 
-Lemma stable_limS (S : set U) (V : U -> R) (V' : U -> U -> R) :
-  compact S -> is_invariant S ->
-  (forall p : U, S p -> filterdiff V (locally p) (V' p)) ->
-  (forall p : U, S p -> (V' p \o X) p <= 0) ->
-  limS S `<=` [set p | (V' p \o X) p = 0].
+Lemma stable_limS (K : set U) (V : U -> R) (V' : U -> U -> R) :
+  compact K -> is_invariant K -> K `<=` S ->
+  (forall p : U, K p -> filterdiff V (locally p) (V' p)) ->
+  (forall p : U, K p -> (V' p \o X) p <= 0) ->
+  limS K `<=` [set p | (V' p \o X) p = 0].
 Proof.
-move=> Sco Sinvar Vdif V'le0 p [q Sq plimxp].
-have Vsol' r : S r -> forall t, 0 <= t ->
+move=> Kco Kinvar sKS Vdif V'le0 p [q Kq plimxp].
+have Vsol' r : K r -> forall t, 0 <= t ->
     is_derive (V \o sol r) t ((V' (sol r t) \o X) (sol r t)).
-  move=> Sr t tge0; have Srt : S (sol r t) by apply: Sinvar.
+  move=> Kr t tge0; have Krt : K (sol r t) by apply: Kinvar.
   (* We should have rewriting rules for differentiation,
      otherwise it introduces evars... *)
   apply: filterdiff_ext_lin.
   apply: filterdiff_comp'.
-    exact: sol_is_sol.
+    by apply: sol_is_sol tge0; apply: sKS.
   exact: Vdif.
   move=> u; rewrite linear_scal //.
-  by have /Vdif [] := Srt.
-have ssqRpS : sol q @` Rle 0 `<=` S.
-  by move=> _ [t tge0 <-]; apply: Sinvar.
+  by have /Vdif [] := Krt.
+have ssqRpK : sol q @` Rle 0 `<=` K.
+  by move=> _ [t tge0 <-]; apply: Kinvar.
 suff : exists l, cluster (sol q @ +oo) `<=` V @^-1` [set l].
   move=> [l Vpliml]; rewrite -[p]sol0; set y := sol p.
   rewrite -[LHS](is_derive_unique (V \o y) 0).
     rewrite (@derive_ext_ge0 _ (fun=> l)); first exact: Derive_const.
       exact: Rle_refl.
-    by move=> t tge0; apply/Vpliml/invariant_pos_limit_set.
+    by move=> t tge0; apply/Vpliml/invariant_pos_limit_set => //; apply: sKS.
   apply: Vsol'=> //; last exact: Rle_refl.
-  apply/(@closure_subset _ S).
-    exact: (compact_closed hU Sco).
-  exact: sub_plim_clos_invar plimxp.
-have Vcont : continuous_on S V.
-  apply: continuous_on_forall => r Sr.
+  suff : is_closed K by apply; apply: sub_plim_clos_invar plimxp.
+  exact: compact_closed.
+have Vcont : continuous_on K V.
+  apply: continuous_on_forall => r Kr.
   by apply: filterdiff_continuous; exists (V' r); apply: Vdif.
 suff [l Vxtol] : [cvg V \o sol q @ +oo].
   exists l; apply: (c0_cvg_cst_on_pos_lim_set Vcont)=> //.
@@ -215,23 +222,23 @@ apply: nincr_lb_cvg.
   move=> s t [sge0 slet].
   apply: (@nincr_function_le _ (Finite 0) (Finite t))=> //; last first.
   - exact: Rle_refl.
-  - by move=> t' t'ge0 _; apply: (V'le0 (sol q t')); apply: Sinvar.
+  - by move=> t' t'ge0 _; apply: (V'le0 (sol q t')); apply: Kinvar.
   - by move=> t' t'ge0 _; apply: Vsol'.
-have: compact (V @` S) by apply: continuous_compact.
+have: compact (V @` K) by apply: continuous_compact.
 move=> /compact_bounded [N hN].
 exists (- N)=> y [t tge0 <-].
-have /hN : (V @` S) ((V \o sol q) t) by apply/imageP/Sinvar.
+have /hN : (V @` K) ((V \o sol q) t) by apply/imageP/Kinvar.
 by move=> /Rabs_def2 [].
 Qed.
 
-Lemma cvg_to_limS (S : set U) : compact S -> is_invariant S ->
-  forall p, S p -> sol p @ +oo --> limS S.
+Lemma cvg_to_limS (K : set U) : compact K -> is_invariant K ->
+  forall p, K p -> sol p @ +oo --> limS K.
 Proof.
-move=> Sco Sinvar p Sp.
+move=> Kco Kinvar p Kp.
 apply: (@cvg_to_superset _ (cluster (sol p @ +oo))).
   by move=> q plimxq; exists p.
-apply: cvg_to_pos_limit_set Sco.
-by exists 0=> t /Rlt_le tge0; exact: Sinvar.
+apply: cvg_to_pos_limit_set Kco.
+by exists 0=> t /Rlt_le tge0; exact: Kinvar.
 Qed.
 
 End DifferentialSystem.

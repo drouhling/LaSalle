@@ -351,9 +351,14 @@ Qed.
 Lemma subset_closure (A : set U) : A `<=` closure A.
 Proof. by move=> p B Bp; exists p; split=> //; apply: locally_singleton. Qed.
 
-Lemma closedP (A : set U) : closed A <-> closure A `<=` A.
+Definition is_closed (A : set U) := closure A `<=` A.
+
+Lemma closed_is_closed (A : set U) : closed A -> is_closed A.
+Proof. by move=> Aclosed p Abarp; apply: Aclosed => /Abarp [? []]. Qed.
+
+Lemma closedP (A : set U) : closed A <-> is_closed A.
 Proof.
-split; first by move=> Aclosed p Abarp; apply: Aclosed => /Abarp [? []].
+split; first exact: closed_is_closed .
 move=> Aclosed p /not_ex_all_not npnA; apply: Aclosed.
 move=> B [eps peps_B].
 have /not_all_ex_not [q] := npnA eps.
@@ -361,12 +366,9 @@ have /not_all_ex_not [q] := npnA eps.
 by move=> /(imply_to_and (ball _ _ _)) [/peps_B Bq /NNPP Aq]; exists q.
 Qed.
 
-Lemma closure_subset (A : set U) : closed A -> closure A `<=` A.
-Proof. by move/closedP. Qed.
-
-Lemma closed_closure (A : set U) : closed (closure A).
+Lemma is_closed_closure (A : set U) : is_closed (closure A).
 Proof.
-apply/closedP => p hp B [eps peps_B].
+move=> p hp B [eps peps_B].
 have /= [q [Abarq pq_heps]] := hp (ball p (pos_div_2 eps)) (locally_ball _ _).
 have /= [r [Ar qr_heps]] := Abarq (ball q (pos_div_2 eps)) (locally_ball _ _).
 exists r; split=> //; apply/peps_B.
@@ -381,12 +383,22 @@ move=> p IFbarp A FA B /IFbarp [q [IFq Bq]].
 by exists q; split=> //; apply: IFq.
 Qed.
 
-Lemma closed_bigcap I (F : set I) (f : I -> set U) :
-  (forall A, F A -> closed (f A)) -> closed (\bigcap_(A in F) f A).
+Lemma is_closed_bigcap I (F : set I) (f : I -> set U) :
+  (forall A, F A -> is_closed (f A)) -> is_closed (\bigcap_(A in F) f A).
 Proof.
-move=> clfamF; apply/closedP => p /closure_bigcap clFp A FA.
-by apply: closure_subset; [exact: clfamF|exact: clFp].
+move=> clfamF => p /closure_bigcap clFp A FA.
+by apply: (clfamF _ FA); apply: clFp.
 Qed.
+
+Lemma is_closed_setI (A B : set U) :
+  is_closed A -> is_closed B -> is_closed (A `&` B).
+Proof.
+by move=> Acl Bcl p ABbarp; split; [apply: Acl|apply: Bcl];
+  move=> C /ABbarp [q [[]]]; exists q.
+Qed.
+
+Lemma is_closed_setC (A : set U) : open A -> is_closed (~` A).
+Proof. by move=> Aop p ACbar_p /Aop /ACbar_p [? []]. Qed.
 
 End Closedness.
 
@@ -437,20 +449,14 @@ Qed.
 
 Definition seg a b := Rle a `&` Rle^~ b.
 
-Lemma seg_closed a b : closed (seg a b).
+Lemma seg_closed a b : is_closed (seg a b).
 Proof.
-apply/closedP => x abbarx.
-apply: between_epsilon.
-move=> eps.
+move=> x abbarx; apply: between_epsilon => eps.
 have /abbarx [y [[aley yleb]]] := locally_ball x eps.
-move/AbsRing_norm_compat2.
-rewrite Rmult_1_l abs_minus.
+move/AbsRing_norm_compat2; rewrite Rmult_1_l abs_minus.
 move/Rlt_le/Rabs_le_between'=> [ymepslex xleypeps].
-split.
-  apply: Rle_trans ymepslex.
-  exact: Rplus_le_compat_r.
-apply: Rle_trans; first exact: xleypeps.
-exact: Rplus_le_compat_r.
+split; first by apply: Rle_trans ymepslex; apply: Rplus_le_compat_r.
+by apply: Rle_trans; [apply: xleypeps|apply: Rplus_le_compat_r].
 Qed.
 
 (* Code adapted from Guillaume Cano's PhD *)
@@ -611,9 +617,9 @@ Definition compact A := forall (F : set (set U)), F A ->
   ProperFilter F -> A `&` cluster F !=set0.
 
 Lemma subclosed_compact (A B : set U) :
-  closed A -> compact B -> A `<=` B -> compact A.
+  is_closed A -> compact B -> A `<=` B -> compact A.
 Proof.
-move=> /closedP Acl Bco sAB F FA Fproper.
+move=> Acl Bco sAB F FA Fproper.
 have [|p [Bp Fp]] := Bco F; first exact: filter_imp FA.
 by exists p; split=> //; apply: Acl=> C Cp; apply: Fp.
 Qed.
@@ -635,9 +641,9 @@ move/(imply_to_and (locally _ _))=> [qB] /not_ex_all_not hAB.
 by exists A; exists B.
 Qed.
 
-Lemma compact_closed (A : set U) : hausdorff -> compact A -> closed A.
+Lemma compact_closed (A : set U) : hausdorff -> compact A -> is_closed A.
 Proof.
-move=> hU Acompact; apply/closedP => p Abarp.
+move=> hU Acompact p Abarp.
 have pA : within A (locally p) A by exists (mkposreal _ Rlt_0_1).
 have [q [Aq hq]] := Acompact _ pA (within_locally_proper Abarp).
 rewrite (hU p q) //.
@@ -650,7 +656,7 @@ Definition open_family Ti (f : family U Ti) :=
   forall i, i \ins (ind f) -> open (f i).
 
 Definition closed_family Ti (f : family U Ti) :=
-  forall i, i \ins (ind f) -> closed (f i).
+  forall i, i \ins (ind f) -> is_closed (f i).
 
 Definition quasi_compact (A : set U) :=
    forall Ti (f : family U Ti),
@@ -670,7 +676,7 @@ Lemma closed_of_setC A Ti (f : family U Ti) : open_of_family A f ->
 Proof.
 move=> [g [opg [gieqfi hgi]]].
 exists (mkfamily (ind f) (fun i => ~` (g i))).
-split; first by move=> j /gieqfi gij; apply/closed_not/opg.
+split; first by move=> j /gieqfi gij; apply/is_closed_setC/opg.
 split=> // j /= fij p; split.
   by move=> [Ap nfjp]; split=> // gjp; apply/nfjp/hgi.
 move=> [Ap ngjp]; split=> // fjp.
@@ -682,7 +688,7 @@ Lemma open_of_setC A Ti (f : family U Ti) : closed_of_family A f ->
 Proof.
 move=> [g [gclo [gieqfi hgi]]].
 exists (mkfamily (ind f) (fun i => ~` (g i))).
-split; first by move=> j /gieqfi gij; apply/open_not/gclo.
+split; first by move=> j /gieqfi gij; apply/open_not/closedP/gclo.
 split=> // j /= fij p; split.
   by move=> [Ap nfjp]; split=> // gjp; apply/nfjp/hgi.
 move=> [Ap ngjp]; split=> // fjp.
@@ -824,7 +830,7 @@ split=> [coA Ti f j fij [g [clg [ind_geqf fieqAgi]]] finIf|fixA F FA Fproper].
   have [|p [Ap clfinIfp]] := coA _ _ (fin_inter_proper finIf).
     by apply: (sffam _ _ fij); move=> p /(fieqAgi _ fij) [].
   exists p => k fik; apply/(fieqAgi _ fik); split=> //.
-  apply: closure_subset; first exact/clg/ind_geqf.
+  apply: clg; first exact/ind_geqf.
   move=> B pB; apply: clfinIfp pB.
   by apply: (sffam _ _ fik); move=> q /(fieqAgi _ fik) [].
 have finIAclF : finite_inter (mkfamily F (fun B => A `&` closure B)).
@@ -832,7 +838,7 @@ have finIAclF : finite_inter (mkfamily F (fun B => A `&` closure B)).
   exact: filter_imp (@subset_closure _ B) _.
 have /(_ FA) [|p AclFIp] := fixA _ _ A _ _ finIAclF.
   exists (mkfamily F (fun B => closure B)); split=> // B FB.
-  exact: closed_closure.
+  exact: is_closed_closure.
 exists p; split=> [|B C FB pC]; first by have /AclFIp [] := FA.
 by have /AclFIp [_] := FB; move=> /(_ _ pC).
 Qed.
@@ -846,7 +852,7 @@ Lemma fixed_compactP A :
   (forall Ti (f : family U Ti) j, ind f j -> closed_of_family A f ->
    finite_inter f -> fixed f) <->
   forall I (F : set I) (f : I -> set U), F !=set0 -> (exists (g : I -> set U),
-    forall i, F i -> f i = A `&` g i /\ closed (g i)) ->
+    forall i, F i -> f i = A `&` g i /\ is_closed (g i)) ->
     \bigcap_(i in F) f i = set0 -> exists (G : set I), finite_set G /\
       G `<=` F /\ \bigcap_(i in G) f i = set0.
 Proof.
@@ -886,7 +892,8 @@ have /subset_Dempty /(empty_setI A) : cluster F `<=` interior B.
 rewrite setIC clusterE (bigcap_setD _ _ FA) (setI_bigcap _ _ FA).
 move=> /coA [||G [finG [sGF clGnB0]]]; first by exists setT; apply: filter_true.
   exists (fun C => closure C `\` interior B) => C FC; split=> //.
-  by apply: closed_and; [apply: closed_closure|apply/closed_not/open_interior].
+  apply: is_closed_setI; first exact/is_closed_closure.
+  exact/is_closed_setC/open_interior.
 have [C GC] : G !=set0.
   apply: NNPP => /not_ex_all_not G0; have /filter_ex [p _] := FA.
   by rewrite -[False]/(set0 p) -clGnB0 => C /G0.
