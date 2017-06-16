@@ -938,6 +938,24 @@ rewrite [X in _ <= X]double_var.
 exact: Rplus_le_compat.
 Qed.
 
+Coercion AbsRing_UniformSpace : AbsRing >-> UniformSpace.
+Lemma hausdorff_normed_module (K : AbsRing) (V : NormedModule K) : hausdorff V.
+Proof.
+move=> p q cllocp_q.
+suff /norm_eq_zero : norm (minus p q) = 0.
+  by rewrite -(minus_eq_zero q); move/plus_reg_r.
+apply: Rhausdorff => A B npmq_A.
+rewrite -(@norm_zero _ V) -(minus_eq_zero p) => npmp_B.
+set f := fun q => norm (minus p q).
+have locfpreim r C : locally (f r) C -> locally r (f @^-1` C).
+  move=> /locally_norm_le_locally [e npmr_e_C].
+  apply: locally_le_locally_norm; exists e => s r_e_s; apply: npmr_e_C.
+  apply: Rle_lt_trans (norm_triangle_inv _ _) _.
+  by rewrite -norm_opp opp_plus !opp_minus -minus_trans.
+have [r []] := cllocp_q _ _ (locfpreim _ _ npmp_B) (locfpreim _ _ npmq_A).
+by exists (f r).
+Qed.
+
 Definition is_bounded (K : AbsRing) (U : NormedModule K) (A : set U) :=
   exists M, forall p, A p -> norm p < M.
 

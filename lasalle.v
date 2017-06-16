@@ -123,8 +123,9 @@ Section DifferentialSystem.
 
 Variable U : {normedModule R}.
 Variable X : U -> U.
-Variable hU : hausdorff U.
 Variable S : set U.
+
+Definition hU : hausdorff U := @hausdorff_normed_module _ U.
 
 Definition is_sol (x : R -> U) := forall t, 0 <= t -> is_derive x t (X (x t)).
 
@@ -210,13 +211,13 @@ suff : exists l, cluster (sol q @ +oo) `<=` V @^-1` [set l].
     by move=> t tge0; apply/Vpliml/invariant_pos_limit_set => //; apply: sKS.
   apply: Vsol'=> //; last exact: Rle_refl.
   suff : is_closed K by apply; apply: sub_plim_clos_invar plimxp.
-  exact: compact_closed.
+  exact: compact_closed hU Kco.
 have Vcont : continuous_on K V.
   apply: continuous_on_forall => r Kr.
   by apply: filterdiff_continuous; exists (V' r); apply: Vdif.
 suff [l Vxtol] : [cvg V \o sol q @ +oo].
   exists l; apply: (c0_cvg_cst_on_pos_lim_set Vcont)=> //.
-  exact: compact_closed.
+  exact: compact_closed hU Kco.
 apply: nincr_lb_cvg.
   move=> s t [sge0 slet].
   apply: (@nincr_function_le _ (Finite 0) (Finite t))=> //; last first.
