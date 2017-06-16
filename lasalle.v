@@ -91,12 +91,11 @@ Lemma c0_cvg_cst_on_pos_lim_set A x (V : U -> R) (l : R) :
   continuous_on A V -> V \o x @ +oo --> l ->
   is_closed A -> x @` Rle 0 `<=` A -> cluster (x @ +oo) `<=` V @^-1` [set l].
 Proof.
-move=> Vcont Vxpl Acl sxRpA p plimp; apply: Rhausdorff.
-have Ap : A p by apply/Acl/(@sub_plim_clos_invar x).
-move=> B C /Vcont - /(_ Ap) VpAB /Vxpl VxpC.
-have : (x @ +oo) (A `&` (V @^-1` C)).
-  by apply: filter_and; [exact: sub_image_at_infty|exact: VxpC].
-by move=> /plimp /(_ VpAB) [q [[Aq CVq] /(_ Aq) BVq]]; exists (V q).
+move=> Vcont Vxpl Acl sxRpA p plimp.
+have Axpinfty : (x @ +oo) A by apply: sub_image_at_infty.
+have : (V @` cluster (x @ +oo)) (V p) by exists p.
+move/(@map_cluster _ _ (x @ +oo) _ _ _ Vcont Axpinfty Acl _).
+by move=> /(filter_le_cluster Vxpl) /Rhausdorff ->.
 Qed.
 
 End PositiveLimitingSet.
