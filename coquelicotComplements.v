@@ -909,11 +909,11 @@ Qed.
 
 End Compactness.
 
-Lemma map_cluster (U V : UniformSpace) (F : set (set U)) (f : U -> V)
-  (A : set U) : ProperFilter F -> continuous_on A f -> F A -> is_closed A ->
+Lemma map_sub_cluster (U V : UniformSpace) (F : set (set U)) (f : U -> V)
+  (A : set U) : Filter F -> continuous_on A f -> F A -> is_closed A ->
   f @` (cluster F) `<=` cluster (f @ F).
 Proof.
-move=> Fproper fcont FA Acl x [p clFp <-] B C fFB.
+move=> Ffilt fcont FA Acl x [p clFp <-] B C fFB.
 have Ap : A p by apply: Acl => ? /clFp - /(_ _ FA).
 move=> /(fcont _ Ap) fp_C.
 suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).

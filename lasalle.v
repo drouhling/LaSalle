@@ -94,7 +94,7 @@ Proof.
 move=> Vcont Vxpl Acl sxRpA p plimp.
 have Axpinfty : (x @ +oo) A by apply: sub_image_at_infty.
 have : (V @` cluster (x @ +oo)) (V p) by exists p.
-move/(@map_cluster _ _ (x @ +oo) _ _ _ Vcont Axpinfty Acl _).
+move=> /(map_sub_cluster _ Vcont Axpinfty Acl).
 by move=> /(filter_le_cluster Vxpl) /Rhausdorff ->.
 Qed.
 
@@ -125,7 +125,7 @@ Variable U : {normedModule R}.
 Variable X : U -> U.
 Variable S : set U.
 
-Definition hU : hausdorff U := @hausdorff_normed_module _ U.
+Let hU : hausdorff U := @hausdorff_normed_module _ U.
 
 Definition is_sol (x : R -> U) := forall t, 0 <= t -> is_derive x t (X (x t)).
 
