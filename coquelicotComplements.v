@@ -322,13 +322,13 @@ apply: Aeps2_C; exists q => //.
 exact: ball_le (Rmin_r _ _) _ q_near_p.
 Qed.
 
-Lemma cvg_to_set1P (x : R -> U) p : x @ +oo --> [set p] <-> x @ +oo --> p.
-Proof. by split=> hx P /locally_set1P; apply: hx. Qed.
+Lemma cvg_to_set1P (y : R -> U) p : y @ +oo --> [set p] <-> y @ +oo --> p.
+Proof. by split=> hy P /locally_set1P; apply: hy. Qed.
 
-Lemma cvg_to_superset A B x : A `<=` B ->
-  x @ +oo --> A -> x @ +oo --> B.
+Lemma cvg_to_superset A B y : A `<=` B ->
+  y @ +oo --> A -> y @ +oo --> B.
 Proof.
-move=> sAB xtoA C /= [eps Beps_C]; apply: xtoA => /=.
+move=> sAB ytoA C /= [eps Beps_C]; apply: ytoA => /=.
 by exists eps; apply: subset_trans Beps_C => p [q /sAB]; exists q.
 Qed.
 
@@ -913,7 +913,7 @@ Lemma map_sub_cluster (U V : UniformSpace) (F : set (set U)) (f : U -> V)
   (A : set U) : Filter F -> continuous_on A f -> F A -> is_closed A ->
   f @` (cluster F) `<=` cluster (f @ F).
 Proof.
-move=> Ffilt fcont FA Acl x [p clFp <-] B C fFB.
+move=> Ffilt fcont FA Acl _ [p clFp <-] B C fFB.
 have Ap : A p by apply: Acl => ? /clFp - /(_ _ FA).
 move=> /(fcont _ Ap) fp_C.
 suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).
@@ -1013,39 +1013,39 @@ Section Continuity.
 
 Variables (T U : UniformSpace).
 
-Lemma locally_preimage (x : T -> U) p A :
-  continuous x p -> locally (x p) A -> locally p (x @^-1` A).
-Proof. by move=> xcontp locxpA; apply: xcontp locxpA. Qed.
+Lemma locally_preimage (f : T -> U) p A :
+  continuous f p -> locally (f p) A -> locally p (f @^-1` A).
+Proof. by move=> fcontp locfpA; apply: fcontp locfpA. Qed.
 
-Lemma continuous_compact (x : T -> U) A :
-  continuous_on A x -> compact A -> compact (x @` A).
+Lemma continuous_compact (f : T -> U) A :
+  continuous_on A f -> compact A -> compact (f @` A).
 Proof.
-move=> xcont compactA F FxA Fproper.
-set G := [set B | exists2 C, F C & A `&` x @^-1` C `<=` B].
+move=> fcont compactA F FfA Fproper.
+set G := [set B | exists2 C, F C & A `&` f @^-1` C `<=` B].
 have Gproper : ProperFilter G.
   split.
     move=> B [C FC hC].
-    have [q [[p Ap <-] Cq]]: x @` A `&` C !=set0.
+    have [q [[p Ap <-] Cq]]: f @` A `&` C !=set0.
       apply: filter_ex; exact: filter_and.
     exists p; exact: hC.
   split.
-  - by exists (x @` A).
+  - by exists (f @` A).
   - move=> B1 B2 [C1 FC1 hC1] [C2 FC2 hC2].
     exists (C1 `&` C2); first by exact: filter_and.
-    move=> p [Ap [C1xp C2xp]].
+    move=> p [Ap [C1fp C2fp]].
     split; [exact: hC1 | exact: hC2].
   - move=> B B' subBB' [C FC hC].
     exists C => //.
     exact: subset_trans subBB'.
-case: (compactA _ _ Gproper); first by exists (x @` A) => // ? [].
+case: (compactA _ _ Gproper); first by exists (f @` A) => // ? [].
 move=> p [Ap hp].
-exists (x p).
+exists (f p).
 split; first by apply/imageP.
 move=> B C hB hC.
-move/xcont: hC=> /(_ Ap) hpC.
-have : G (A `&` x @^-1` B) by exists B.
-move/hp=> /(_ _ hpC) [q [[Aq Bxq]]] /(_ Aq).
-by exists (x q).
+move/fcont: hC=> /(_ Ap) hpC.
+have : G (A `&` f @^-1` B) by exists B.
+move/hp=> /(_ _ hpC) [q [[Aq Bfq]]] /(_ Aq).
+by exists (f q).
 Qed.
 
 End Continuity.
