@@ -127,7 +127,7 @@ Let hU : hausdorff U := @hausdorff_normed_module _ U.
 (* function defining the differential system *)
 Variable F : U -> U.
 
-Definition is_sol (y : R -> U) := forall t, 0 <= t -> is_derive y t (F (y t)).
+Definition is_sol (y : R -> U) := forall t, is_derive y t (F (y t)).
 
 (* set on which there are solutions *)
 Variable S : set U.
@@ -155,7 +155,7 @@ Lemma sol_shift p t0 :
 Proof.
 move=> Sp t0ge0; apply: uniq_sol;
   try apply: sol_is_sol; rewrite ?Rplus_0_l ?sol0 //; try exact: Sinvar.
-by move=> t tge0; apply/is_derive_shift/(sol_is_sol Sp)/Rplus_le_le_0_compat.
+by move=> t; apply/is_derive_shift/(sol_is_sol Sp).
 Qed.
 
 Lemma solD p t0 t : S p -> 0 <= t0 -> sol p (t + t0) = sol (sol p t0) t.
@@ -200,7 +200,7 @@ have Vsol' r : K r -> forall t, 0 <= t ->
      otherwise it introduces evars... *)
   apply: filterdiff_ext_lin.
   apply: filterdiff_comp'.
-    by apply: sol_is_sol tge0; apply: sKS.
+    by apply: sol_is_sol; apply: sKS.
   exact: Vdif.
   move=> u; rewrite linear_scal //.
   by have /Vdif [] := Krt.
