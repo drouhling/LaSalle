@@ -126,27 +126,39 @@ Proof.
 by move=> X0; apply/funext => a; apply/propext; split=> // - []; rewrite X0.
 Qed.
 
-Lemma bigcap_setI A I (F : set I) (f : I -> set A) (X : set A) i :
-  F i -> \bigcap_(i in F) f i `&` X = \bigcap_(i in F) (f i `&` X).
+Lemma bigcap_setI A I (F : set I) (f : I -> set A) (X : set A) :
+  \bigcap_(i in F) f i `&` (fun a => F !=set0 -> X a) =
+  \bigcap_(i in F) (f i `&` X).
 Proof.
-move=> Fi; apply/funext => a; apply/propext; split.
-  by move=> [Ifa Xa] j Fj; split=> //; apply: Ifa.
-move=> IfIXa; split; [by move=> j /IfIXa []|by have /IfIXa [] := Fi].
+apply/funext => a; apply/propext; split.
+  move=> [Ifa Xa] j Fj; split=> //; [exact: Ifa|by apply: Xa; exists j].
+move=> IfIXa; split; [by move=> j /IfIXa []|by move=> [i Fi]; have /IfIXa [] := Fi].
 Qed.
 
-Lemma setI_bigcap A I (F : set I) (f : I -> set A) (X : set A) i :
+Lemma bigcap_setIN0 A I (F : set I) (f : I -> set A) (X : set A) i :
+  F i -> \bigcap_(i in F) f i `&` X = \bigcap_(i in F) (f i `&` X).
+Proof.
+move=> Fi; rewrite -bigcap_setI; congr (_ `&` _); apply/funext=> x.
+by apply/propext; split=> //; apply; exists i.
+Qed.
+
+Lemma setIN0_bigcap A I (F : set I) (f : I -> set A) (X : set A) i :
   F i -> X `&` \bigcap_(i in F) f i = \bigcap_(i in F) (X `&` f i).
 Proof.
-move=> Fi; rewrite setIC (bigcap_setI _ _ Fi).
+move=> Fi; rewrite setIC (bigcap_setIN0 _ _ Fi).
 by apply/funext => a; apply/propext; split=> IfIXa j /IfIXa; rewrite setIC.
 Qed.
 
 Lemma setDE A (X Y : set A) : X `\` Y = X `&` ~` Y.
 Proof. by []. Qed.
 
-Lemma bigcap_setD A I (F : set I) (f : I -> set A) (X : set A) i :
+Lemma bigcap_setD A I (F : set I) (f : I -> set A) (X : set A) :
+  \bigcap_(i in F) f i `&` (fun a => F !=set0 -> ~ X a) = \bigcap_(i in F) (f i `\` X).
+Proof. by rewrite bigcap_setI. Qed.
+
+Lemma bigcap_setDN0 A I (F : set I) (f : I -> set A) (X : set A) i :
   F i -> \bigcap_(i in F) f i `\` X = \bigcap_(i in F) (f i `\` X).
-Proof. by move=> Fi; rewrite setDE (bigcap_setI _ _ Fi). Qed.
+Proof. by move=> Fi; rewrite setDE (bigcap_setIN0 _ _ Fi). Qed.
 
 Lemma imageP A B (f : A -> B) (X : set A) a : X a -> (f @` X) (f a).
 Proof. by exists a. Qed.
@@ -889,19 +901,19 @@ move=> Fproper FA /compact_fixed /fixed_compactP coA eps.
 set B := ball_set (cluster F) eps.
 have /subset_Dempty /(empty_setI A) : cluster F `<=` interior B.
   by move=> p clFp; exists eps => q peps_q; exists p.
-rewrite setIC clusterE (bigcap_setD _ _ FA) (setI_bigcap _ _ FA).
+rewrite setIC clusterE (bigcap_setDN0 _ _ FA) (setIN0_bigcap _ _ FA).
 move=> /coA [||G [finG [sGF clGnB0]]]; first by exists setT; apply: filter_true.
   exists (fun C => closure C `\` interior B) => C FC; split=> //.
   apply: is_closed_setI; first exact/is_closed_closure.
   exact/is_closed_setC/open_interior.
-have [C GC] : G !=set0.
-  apply: NNPP => /not_ex_all_not G0; have /filter_ex [p _] := FA.
-  by rewrite -[False]/(set0 p) -clGnB0 => C /G0.
+(* have [C GC] : G !=set0. *)
+(*   apply: NNPP => /not_ex_all_not G0; have /filter_ex [p _] := FA. *)
+(*   by rewrite -[False]/(set0 p) -clGnB0 => C /G0. *)
 move: clGnB0; have -> : \bigcap_(C in G) (A `&` (closure C `\` interior B)) =
   \bigcap_(C in G) (A `&` closure C `\` interior B).
   apply/funext => a; apply/propext.
   by split=> [IclGa ? /IclGa [? []]|IclGa ? /IclGa [[]]].
-rewrite -(bigcap_setD _ _ GC) => /Dempty_subset sIclGintB.
+rewrite -bigcap_setD. => /Dempty_subset sIclGintB.
 apply: filter_imp (@interior_subset _ B) _; apply: filter_imp sIclGintB _.
 apply: filter_bigcap finG _ => D GD; apply: filter_and FA _.
 by apply: filter_imp (@subset_closure _ D) _; apply: sGF.
