@@ -127,7 +127,9 @@ Let hU : hausdorff U := @hausdorff_normed_module _ U.
 (* function defining the differential system *)
 Variable F : U -> U.
 
-Definition is_sol (y : R -> U) := forall t, is_derive y t (F (y t)).
+Definition is_sol (y : R -> U) :=
+  (forall t, t < 0 -> y t = minus (scal 2 (y 0)) (y (- t))) /\
+  forall t, 0 <= t -> is_derive y t (F (y t)).
 
 (* compact set used in LaSalle's invariance principle *)
 Variable K : set U.
@@ -151,16 +153,80 @@ Definition is_invariant A := forall p, A p -> forall t, 0 <= t -> A (sol p t).
 
 Hypothesis Kinvar : is_invariant K.
 
-Lemma sol_shift p t0 :
-  K p -> 0 <= t0 -> sol (sol p t0) = (fun t => sol p (t + t0)).
+(* Lemma sol_shift p t0 : *)
+(*   K p -> 0 <= t0 -> sol (sol p t0) = (fun t => sol p (t + t0)). *)
+(* Proof. *)
+(* move=> Kp t0ge0; apply: uniq_sol; *)
+(*   try apply: sol_is_sol; rewrite ?Rplus_0_l ?sol0 //; try exact: Kinvar. *)
+(* by move=> t; apply/is_derive_shift/(sol_is_sol Kp). *)
+(* Qed. *)
+
+(* Lemma solD p t0 t : K p -> 0 <= t0 -> sol p (t + t0) = sol (sol p t0) t. *)
+(* Proof. by move=> Kp t0ge0; rewrite sol_shift. Qed. *)
+
+Definition shift_sol p t0 t :=
+  match (Rle_lt_dec 0 t) with
+  | left _ => sol p (t + t0)
+  | right _ => minus (scal 2 (sol p t0)) (sol p (- t + t0))
+  end.
+
+Lemma sol_shift p t0 : K p -> 0 <= t0 -> is_sol (shift_sol p t0).
 Proof.
-move=> Kp t0ge0; apply: uniq_sol;
-  try apply: sol_is_sol; rewrite ?Rplus_0_l ?sol0 //; try exact: Kinvar.
-by move=> t; apply/is_derive_shift/(sol_is_sol Kp).
+move=> Kp t0ge0; split=> [t tlt0|t tge0].
+  rewrite /shift_sol Ropp_0 Rplus_0_l Ropp_involutive.
+  case: (Rle_lt_dec 0 0) => [_|/Rlt_irrefl //].
+  case: (Rle_lt_dec 0 t) => [/Rle_not_lt //|_].
+  case: (Rle_lt_dec 0 (- t)) => [//|/Rlt_le].
+  by have /Ropp_gt_lt_0_contravar /Rgt_not_le := tlt0.
+split; first exact: is_linear_scal_l.
+move=> _ /is_filter_lim_locally_unique <- eps.
+have /sol_is_sol [_ solp] := Kp.
+have /solp [_ /(_ (t + t0)) h] : 0 <= t + t0 by apply: Rplus_le_le_0_compat.
+have /h /(_ eps) [e he] : is_filter_lim (locally (t + t0)) (t + t0) by [].
+rewrite /shift_sol; case: (Rle_lt_dec 0 t) => [_|/Rlt_not_le //].
+have minus_addr s : minus (s + t0) (t + t0) = minus s t.
+  by rewrite /minus /plus /opp /=; ring.
+have /Rle_lt_or_eq_dec := tge0; case=> [tgt0|teq0].
+  have hpos : 0 < Rmin (Rabs t) e.
+    by apply: Rmin_pos; [apply/Rabs_pos_lt/Rgt_not_eq/Rlt_gt|apply: cond_pos].
+  exists (mkposreal _ hpos) => s hs.
+  have sge0 : 0 <= s.
+    move: hs; rewrite /ball /= /AbsRing_ball /= /minus /plus /opp /abs /=.
+    move=> /Rabs_lt_between [/Rlt_minus_r hs _].
+    apply: Rlt_le; apply: Rle_lt_trans hs.
+    rewrite Rplus_comm; apply/(Rminus_le_0 _ t).
+    by apply: Rle_trans (Rmin_l _ _) _; rewrite Rabs_pos_eq //; apply: Rle_refl.
+  have /he : ball (t + t0) e (s + t0).
+    rewrite /ball /= /AbsRing_ball /= minus_addr.
+    by apply: Rlt_le_trans hs _; apply: Rmin_r.
+  by case: (Rle_lt_dec 0 s)=> [_|/Rlt_not_le //]; rewrite minus_addr.
+exists e => s hs; case: (Rle_lt_dec 0 s) => _.
+  have /he : ball (t + t0) e (s + t0).
+    by rewrite /ball /= /AbsRing_ball /= minus_addr; apply: hs.
+  by rewrite minus_addr.
+have /he : ball (t + t0) e (- s + t0).
+  move: hs.
+  by rewrite /ball /= /AbsRing_ball /= minus_addr -teq0 !minus_zero_r abs_opp.
+rewrite minus_addr -teq0 Rplus_0_l !minus_zero_r norm_opp.
+have -> : minus (minus (scal 2 (sol p t0)) (sol p (- s + t0))) (sol p  t0) =
+          minus (sol p t0) (sol p (- s + t0)).
+  rewrite [minus _ _]plus_comm plus_assoc -scal_opp_one -scal_distr_r.
+  have -> : plus (opp one) 2 = one by rewrite /plus /opp /one /=; ring.
+  by rewrite scal_one.
+by rewrite scal_opp_l -[X in minus X _]opp_minus -[X in norm X]opp_plus
+           norm_opp.
 Qed.
 
-Lemma solD p t0 t : K p -> 0 <= t0 -> sol p (t + t0) = sol (sol p t0) t.
-Proof. by move=> Kp t0ge0; rewrite sol_shift. Qed.
+Lemma solD p t0 t :
+  K p -> 0 <= t0 -> 0 <= t -> sol p (t + t0) = sol (sol p t0) t.
+Proof.
+move=> Kp t0ge0 tge0.
+have /sol_shift /(_ t0ge0) /solP := Kp.
+rewrite /shift_sol; case: (Rle_lt_dec 0 0) => [_|/Rlt_irrefl //].
+rewrite Rplus_0_l.
+have Ksolpt0 : K (sol p t0) by apply: Kinvar.
+by move=> /(_ Ksolpt0) <-; case: (Rle_lt_dec 0 t) => [_|/Rlt_not_le].
+Qed.
 
 Lemma invariant_pos_limit_set p : K p -> is_invariant (cluster (sol p @ +oo)).
 Proof.
@@ -201,7 +267,7 @@ have Vsol' r : K r -> forall t, 0 <= t ->
      otherwise it introduces evars... *)
   apply: filterdiff_ext_lin.
   apply: filterdiff_comp'.
-    exact: sol_is_sol.
+    by have /sol_is_sol [_] := Kr; apply.
   exact: Vdif.
   move=> u; rewrite linear_scal //.
   by have /Vdif [] := Krt.
