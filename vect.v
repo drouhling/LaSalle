@@ -86,24 +86,19 @@ Lemma bigRmax_mkcond (I : finType) (P : pred I) F :
   (forall i, 0 <= F i) ->
   \big[Rmax/0]_(i | P i) F i = \big[Rmax/0]_i (if P i then F i else 0).
 Proof.
-  move=> Fge0.
-  rewrite unlock /=.
-  elim: (index_enum I)=> //= i r ->; case P=> //.
-  rewrite Rmax_right //= /reducebig /applybig /funcomp /=.
-  case: r=> [|a r] /=; first exact: Rle_refl.
-  case: (P a); last exact: Rmax_l.
-  by apply/Rmax_Rle; left.
+move=> Fge0; rewrite unlock.
+elim: (index_enum I)=> //= i r ->; case P=> //; rewrite Rmax_right //=.
+case: r=> [|a r] /=; first exact: Rle_refl; case: (P a); last exact: Rmax_l.
+by apply/Rmax_Rle; left.
 Qed.
 
 Lemma bigRmax_split (I : finType) (P : pred I) F1 F2 :
-  (forall i, 0 <= F1 i) -> (forall i, 0 <= F2 i) ->
   \big[Rmax/0]_(i | P i) (Rmax (F1 i) (F2 i)) =
   Rmax (\big[Rmax/0]_(i | P i) F1 i) (\big[Rmax/0]_(i | P i) F2 i).
 Proof.
-  move=> F1ge0 F2ge0.
-  elim/big_rec3: _=> [|i x y _ _ ->]; first by rewrite Rmax_eq.
-  rewrite [RHS]Rmax_assoc [LHS]Rmax_assoc; congr (Rmax _ _).
-  by rewrite -[RHS]Rmax_assoc (Rmax_comm y) Rmax_assoc.
+elim/big_rec3: _=> [|i x y _ _ ->]; first by rewrite Rmax_eq.
+rewrite [RHS]Rmax_assoc [LHS]Rmax_assoc; congr (Rmax _ _).
+by rewrite -[RHS]Rmax_assoc (Rmax_comm y) Rmax_assoc.
 Qed.
 
 Lemma bigRmaxID (I : finType) (P : pred I) F :
@@ -111,21 +106,16 @@ Lemma bigRmaxID (I : finType) (P : pred I) F :
   \big[Rmax/0]_i F i = Rmax (\big[Rmax/0]_(i | P i) F i)
                             (\big[Rmax/0]_(i | ~~ (P i)) F i).
 Proof.
-  move=> Fge0.
-  rewrite (bigRmax_mkcond P Fge0) (bigRmax_mkcond (fun i => ~~ P i) Fge0)
-          -bigRmax_split.
-  apply: eq_bigr => i; case: (P i); rewrite /=.
-  - by rewrite Rmax_left.
-  - by rewrite Rmax_right.
-  - by move=> i; case: (P i)=> //=; apply: Rle_refl.
-  - by move=> i; case: (~~ P i)=> //=; apply: Rle_refl.
+move=> Fge0; rewrite (bigRmax_mkcond P Fge0)
+  (bigRmax_mkcond (fun i => ~~ P i) Fge0) -bigRmax_split.
+by apply: eq_bigr => i; case: (P i); [rewrite Rmax_left|rewrite Rmax_right].
 Qed.
 
 Lemma bigRmaxD1 (I : finType) (F : I -> R) i : (forall i, 0 <= F i) ->
   \big[Rmax/0]_j F j = Rmax (F i) (\big[Rmax/0]_(j | j != i) F j).
 Proof.
-  move=> Fge0; rewrite (bigRmaxID (pred1 i)) //; congr (Rmax _ _).
-  by rewrite -big_filter filter_index_enum enum1 unlock /= Rmax_left.
+move=> Fge0; rewrite (bigRmaxID (pred1 i)) //; congr (Rmax _ _).
+by rewrite -big_filter filter_index_enum enum1 unlock /= Rmax_left.
 Qed.
 
 Lemma leq_bigRmax (I : finType) (F : I -> R) :
@@ -135,10 +125,9 @@ Proof. by move=> Fge0 i; rewrite (bigRmaxD1 i) //; apply: Rmax_l. Qed.
 Lemma bigRmax_le_compat (I : finType) (F1 F2 : I -> R) :
   (forall i, F1 i <= F2 i) -> \big[Rmax/0]_i (F1 i) <= \big[Rmax/0]_i (F2 i).
 Proof.
-  move=> fle.
-  rewrite unlock /=.
-  elim: (index_enum I)=> /= [|i r hr]; first exact: Rle_refl.
-  exact: Rmax_le_compat.
+move=> F1leF2; rewrite unlock.
+elim: (index_enum I)=> /= [|i r F1rleF2r]; first exact: Rle_refl.
+exact: Rmax_le_compat.
 Qed.
 Arguments bigRmax_le_compat [I F1] _ _.
 
@@ -147,19 +136,13 @@ Lemma bigRmax_opconst_r (I : finType) (F : I -> R) c op :
   (forall x y z, 0 <= z -> 0 <= x <= y -> 0 <= op x z <= op y z) ->
   \big[Rmax/0]_i (op (F i) c) <= op (\big[Rmax/0]_i F i) c.
 Proof.
-  move=> Fge0 cge0 opndec1.
-  rewrite unlock /=.
-  elim: (index_enum I)=> /= [|i r hr].
-  apply: proj1.
-  apply: opndec1=> //; split; [exact: Rle_refl|exact: cge0].
-  apply: Rmax_lub.
-    apply opndec1=> //; split=> //; exact: Rmax_l.
-  apply: Rle_trans.
-    exact: hr.
-  apply opndec1=> //; split; last exact: Rmax_r.
-  rewrite /reducebig /applybig /funcomp /= {hr}.
-  case: r=> /= [|a r]; first exact: Rle_refl.
-  by apply/Rmax_Rle; left.
+move=> Fge0 cge0 opndec1; rewrite unlock.
+elim: (index_enum I)=> /= [|i r rop_le_opr].
+  suff [] : 0 <= op 0 c <= op 0 c by [].
+  by apply: opndec1=> //; split; apply: Rle_refl.
+apply: Rmax_lub; first by apply opndec1=> //; split=> //; apply: Rmax_l.
+apply: Rle_trans rop_le_opr _; apply opndec1=> //; split; last exact: Rmax_r.
+by case: r=> /= [|a r]; [apply: Rle_refl|apply/Rmax_Rle; left].
 Qed.
 
 Lemma bigRmax_opconst_l (I : finType) (F : I -> R) c op :
@@ -167,29 +150,21 @@ Lemma bigRmax_opconst_l (I : finType) (F : I -> R) c op :
   (forall x y z, 0 <= z -> 0 <= x <= y -> 0 <= op z x <= op z y) ->
   \big[Rmax/0]_i (op c (F i)) <= op c (\big[Rmax/0]_i F i).
 Proof.
-  move=> Fge0 cge0 opndec1.
-  rewrite unlock /=.
-  elim: (index_enum I)=> /= [|i r hr].
-  apply: proj1.
-  apply: opndec1=> //; split; [exact: Rle_refl|exact: cge0].
-  apply: Rmax_lub.
-    apply opndec1=> //; split=> //; exact: Rmax_l.
-  apply: Rle_trans.
-    exact: hr.
-  apply opndec1=> //; split; last exact: Rmax_r.
-  rewrite /reducebig /applybig /funcomp /= {hr}.
-  case: r=> /= [|a r]; first exact: Rle_refl.
-  by apply/Rmax_Rle; left.
+move=> Fge0 cge0 opndec2; rewrite unlock.
+elim: (index_enum I)=> /= [|i r rop_le_opr].
+  suff [] : 0 <= op c 0 <= op c 0 by [].
+  by apply: opndec2=> //; split; apply: Rle_refl.
+apply: Rmax_lub; first by apply opndec2=> //; split=> //; apply: Rmax_l.
+apply: Rle_trans rop_le_opr _; apply opndec2=> //; split; last exact: Rmax_r.
+by case: r=> /= [|a r]; [apply: Rle_refl|apply/Rmax_Rle; left].
 Qed.
 
 Lemma bigRmax_ge0 (I : finType) (F : I -> R) :
   (forall i, 0 <= F i) -> 0 <= \big[Rmax/0]_i F i.
 Proof.
-  move=> Fge0.
-  rewrite unlock /=.
-  elim: (index_enum I)=> /= [|i r hr]; first exact: Rle_refl.
-  apply: (Rle_trans _ _ _ (Fge0 i)).
-  exact: Rmax_l.
+move=> Fge0; rewrite unlock.
+elim: (index_enum I)=> /= [|i r Frge0]; first exact: Rle_refl.
+by apply: Rle_trans (Fge0 i) _; apply: Rmax_l.
 Qed.
 
 Lemma bigRmax_le_ndec (I : finType) (F1 F2 : I -> R) op :
@@ -199,23 +174,19 @@ Lemma bigRmax_le_ndec (I : finType) (F1 F2 : I -> R) op :
   \big[Rmax/0]_i (op (F1 i) (F2 i)) <= op (\big[Rmax/0]_i F1 i)
                                           (\big[Rmax/0]_i F2 i).
 Proof.
-  move=> F1ge0 F2ge0 opndec1 opndec2.
-  apply: Rle_trans.
-    apply: bigRmax_le_compat=> i.
-    apply opndec2=> // ; split=> //.
-    exact: leq_bigRmax.
-  apply: Rle_trans; last exact: Rle_refl.
-  apply: bigRmax_opconst_r=> //.
-  exact: bigRmax_ge0.
+move=> F1ge0 F2ge0 opndec1 opndec2.
+have : \big[Rmax/0]_i (op (F1 i) (\big[Rmax/0]_j F2 j)) <=
+       op (\big[Rmax/0]_i F1 i) (\big[Rmax/0]_i F2 i).
+  by apply: bigRmax_opconst_r=> //; apply: bigRmax_ge0.
+apply/Rle_trans/bigRmax_le_compat => i.
+by apply opndec2 => //; split=> //; apply: leq_bigRmax.
 Qed.
 
 Lemma bigRmax_eq0 (I : finType) (F : I -> R) :
   (forall i, 0 <= F i) -> \big[Rmax/0]_i F i = 0 -> forall i, F i = 0.
 Proof.
-  move=> Fge0 maxF0 i.
-  apply: Rle_antisym=> //.
-  rewrite -maxF0.
-  exact: leq_bigRmax.
+move=> Fge0 maxF0 i; apply: Rle_antisym=> //; rewrite -maxF0.
+exact: leq_bigRmax.
 Qed.
 
 End BigRmax.
@@ -229,66 +200,47 @@ Definition vabs (x : 'rV[A]_n.+1) := \big[Rmax/0]_i (abs (x ord0 i)).
 
 Lemma vabs0 : vabs zero = 0.
 Proof.
-  rewrite /vabs (eq_bigr (fun _ => 0))=> [|i _].
-    rewrite big_const_ord iterS Rmax_eq //.
-    by elim: n=> [|? ihn] //=; rewrite Rmax_eq.
-  by rewrite mxE abs_zero.
+rewrite /vabs (eq_bigr (fun _ => 0))=> [|i _]; last by rewrite mxE abs_zero.
+rewrite big_const_ord iterS Rmax_eq //.
+by elim: n=> [|? ih] //=; rewrite Rmax_eq.
 Qed.
 
 Lemma vabs_opp1 : vabs (opp one) = 1.
 Proof.
-  rewrite /vabs (eq_bigr (fun _ => 1))=> [|i _].
-    rewrite big_const_ord iterS Rmax_left //.
-    elim: n=> [|? ihn] /=; first exact: Rle_0_1.
-    rewrite Rmax_left //.
-    exact: Rle_refl.
-  by rewrite !mxE abs_opp_one.
+rewrite /vabs (eq_bigr (fun _ => 1))=> [|i _]; last by rewrite !mxE abs_opp_one.
+rewrite big_const_ord iterS Rmax_left //.
+by elim: n=> [|? ih]; [apply: Rle_0_1|rewrite /= Rmax_left //; apply: Rle_refl].
 Qed.
 
 Lemma vabs_triangle x y : vabs (plus x y) <= (vabs x) + (vabs y).
 Proof.
-  apply: Rle_trans.
-    apply: bigRmax_le_compat.
-    move=> i.
-    rewrite mxE.
-    exact: abs_triangle.
-  apply: bigRmax_le_ndec=> [i|i|a b c|a b c].
-  - exact: abs_ge_0.
-  - exact: abs_ge_0.
-  - move=> cge0 [age0 aleb].
-    split; first exact: Rplus_le_le_0_compat.
-    exact: Rplus_le_compat_r.
-  - move=> cge0 [age0 aleb].
-    split; first exact: Rplus_le_le_0_compat.
-    exact: Rplus_le_compat_l.
+suff : \big[Rmax/0]_i (abs (x ord0 i) + abs (y ord0 i)) <= vabs x + vabs y.
+  apply: Rle_trans; apply: bigRmax_le_compat => i; rewrite mxE.
+  exact: abs_triangle.
+apply: bigRmax_le_ndec=> [i|i|a b c|a b c]; try exact: abs_ge_0.
+  move=> cge0 [age0 aleb]; split; first exact: Rplus_le_le_0_compat.
+  exact: Rplus_le_compat_r.
+move=> cge0 [age0 aleb]; split; first exact: Rplus_le_le_0_compat.
+exact: Rplus_le_compat_l.
 Qed.
 
 Lemma vabsM x y : vabs (mult x y) <= (vabs x) * (vabs y).
 Proof.
-  apply: Rle_trans.
-    apply: bigRmax_le_compat.
-    move=> i.
-    rewrite mxE.
-    exact: abs_mult.
-  apply: bigRmax_le_ndec=> [i|i|a b c|a b c].
-  - exact: abs_ge_0.
-  - exact: abs_ge_0.
-  - move=> cge0 [age0 aleb].
-    split; first exact: Rmult_le_pos.
-    exact: Rmult_le_compat_r.
-  - move=> cge0 [age0 aleb].
-    split; first exact: Rmult_le_pos.
-    exact: Rmult_le_compat_l.
+suff : \big[Rmax/0]_i (abs (x ord0 i) * abs (y ord0 i)) <= vabs x * vabs y.
+  apply: Rle_trans; apply: bigRmax_le_compat => i; rewrite mxE.
+  exact: abs_mult.
+apply: bigRmax_le_ndec=> [i|i|a b c|a b c]; try exact: abs_ge_0.
+  move=> cge0 [age0 aleb]; split; first exact: Rmult_le_pos.
+  exact: Rmult_le_compat_r.
+move=> cge0 [age0 aleb]; split; first exact: Rmult_le_pos.
+exact: Rmult_le_compat_l.
 Qed.
 
 Lemma vabs_eq0 x : vabs x = 0 -> x = zero.
 Proof.
-  move=> absx0.
-  apply/matrixP=> i j.
-  rewrite ord1 [RHS]mxE -(abs_eq_zero (x ord0 j)) //.
-  apply: (bigRmax_eq0 _ absx0).
-  move=> k.
-  exact: abs_ge_0.
+move=> absx0; apply/matrixP=> i j.
+rewrite ord1 [RHS]mxE -(abs_eq_zero (x ord0 j)) //.
+by apply: (bigRmax_eq0 _ absx0) => k; apply: abs_ge_0.
 Qed.
 
 End vectAbsRing.
@@ -312,11 +264,13 @@ Lemma vball_refl x (e : posreal) : vball x e x.
 Proof. by move=> ?; apply: ball_center. Qed.
 
 Lemma vball_sym x y e : vball x e y -> vball y e x.
-Proof. by move=> hxy ?; apply/ball_sym/hxy. Qed.
+Proof. by move=> xe_y ?; apply/ball_sym/xe_y. Qed.
 
 Lemma vball_triangle x y z e1 e2 :
   vball x e1 y -> vball y e2 z -> vball x (e1 + e2) z.
-Proof. by move=> hxy hyz ?; apply: ball_triangle; [apply: hxy| apply: hyz]. Qed.
+Proof.
+by move=> xe1_y ye2_z ?; apply: ball_triangle; [apply: xe1_y| apply: ye2_z].
+Qed.
 
 End vectUnifSpace.
 
@@ -327,30 +281,25 @@ Definition vect_UniformSpaceMixin (U : UniformSpace) (n : nat) :=
 Canonical vect_UniformSpace (U : UniformSpace) (n : nat) :=
   UniformSpace.Pack _ (vect_UniformSpaceMixin U n) 'rV[U]_n.
 
-Lemma big_and_proj n (P : 'I_n -> Prop) (i : 'I_n) :
-  \big[and/True]_j P j -> P i.
+Local Open Scope classical_set_scope.
+
+Lemma big_and_proj n (A : set 'I_n) (i : 'I_n) :
+  \big[and/True]_j A j -> A i.
 Proof.
-  elim: n i P=> [[]|n ihn i P] //.
-  rewrite big_ord_recl.
-  move=> [P0 /ihn PS].
-  case: (eqVneq ord0 i)=> [<-|ine0] //.
-  by case: (unlift_some ine0)=> j ->.
+elim: n i A=> [[]|n ihn i A] //.
+rewrite big_ord_recl; move => [A0 /ihn AS].
+case: (eqVneq ord0 i)=> [<-|ine0] //.
+by case: (unlift_some ine0)=> j ->.
 Qed.
 
-Lemma filt_big_and n U (P : 'I_n -> U -> Prop) (F : (U -> Prop) -> Prop) :
-  Filter F -> (forall i, F (P i)) -> F (fun x => \big[and/True]_i P i x).
+Lemma filt_big_and n U (A : 'I_n -> set U) (F : set (set U)) :
+  Filter F -> (forall i, F (A i)) -> F (fun x => \big[and/True]_i A i x).
 Proof.
-  move=> [FT FI Fsub].
-  elim: n P=> [|n ihn] P hP.
-    apply: Fsub FT.
-    by move=> ?; rewrite big_ord0.
-  apply: Fsub.
-    move=> x hx.
-    rewrite big_ord_recl.
-    exact: hx.
-  apply: FI=> //.
-  apply: ihn=> i.
-  exact: hP.
+move=> Ffilter; elim: n A=> [|n ihn] A FA.
+  by apply: filter_imp filter_true => ?; rewrite big_ord0.
+have : F [set p : U | A ord0 p /\ \big[and/True]_(i < n) A (lift ord0 i) p].
+  by apply: filter_and=> //; apply: ihn=> i; apply: FA.
+by apply: filter_imp => x Ax; rewrite big_ord_recl.
 Qed.
 
 Section vectCompleteSpace.
@@ -358,53 +307,43 @@ Section vectCompleteSpace.
 Variable T : CompleteSpace.
 Variable n : nat.
 
-Definition proj (F : ('rV[T]_n -> Prop) -> Prop) (i : 'I_n) (P : T -> Prop) :=
-  F (fun x => P (x ord0 i)).
+Definition proj (F : set (set 'rV[T]_n)) (i : 'I_n) (A : set T) :=
+  F (fun x => A (x ord0 i)).
 
-Definition vlim (F : ('rV[T]_n -> Prop) -> Prop) := \row_i (lim (proj F i)).
+Definition vlim (F : set (set 'rV[T]_n)) := \row_i (lim (proj F i)).
 
-Instance proj_proper (F : ('rV[T]_n -> Prop) -> Prop) (i : 'I_n) :
+Instance proj_proper (F : set (set 'rV[T]_n)) (i : 'I_n) :
   ProperFilter F -> ProperFilter (proj F i).
 Proof.
-  move=> [Fn0 [FT FI Fsub]].
-  split; first by move=> P hP; have [x Px] := Fn0 _ hP; exists (x ord0 i).
-  split=> // [P Q FP FQ|P Q PsubQ FP]; first exact: FI.
-  apply: Fsub FP.
-  by move=> x; apply: PsubQ.
+move=> Fproper; split; first by move=> A /filter_ex.
+split; first exact: filter_true.
+  by move=> A B FA FB; apply: filter_and.
+by move=> A B sAB; apply: filter_imp.
 Qed.
 
-Lemma proj_cauchy (F : ('rV[T]_n -> Prop) -> Prop) (i : 'I_n) :
+Lemma proj_cauchy (F : set (set 'rV[T]_n)) (i : 'I_n) :
   Filter F -> cauchy F -> cauchy (proj F i).
 Proof.
-  move=> [_ _ Fsub] Fcauchy eps.
-  have [x hx] := Fcauchy eps.
-  exists (x ord0 i).
-  exact: Fsub hx.
+move=> Ffilter Fcauchy eps; have [x Fxe] := Fcauchy eps; exists (x ord0 i).
+exact: (@filter_imp _ F) Fxe.
 Qed.
 
 Lemma vcomplete_cauchy F :
   ProperFilter F -> cauchy F -> forall eps : posreal, F (ball (vlim F) eps).
 Proof.
-  move=> Fproper Fcauchy eps.
-  suff : forall i, proj F i (ball (vlim F ord0 i) eps).
-    move=> hF.
-    suff : F (fun y => \big[and/True]_(i < n) (ball (vlim F ord0 i) eps
-      (y ord0 i))).
-      apply: filter_imp.
-      move=> y hy i.
-      exact: big_and_proj hy.
-    exact: filt_big_and.
-  move=> i.
-  rewrite mxE.
-  apply: complete_cauchy.
-  exact: proj_cauchy.
+move=> Fproper Fcauchy eps.
+have Fi_limF : forall i, proj F i (ball (vlim F ord0 i) eps).
+  by move=> i; rewrite mxE; apply: complete_cauchy; apply: proj_cauchy.
+have: F (fun y => \big[and/True]_(i < n) (ball (vlim F ord0 i) eps (y ord0 i))).
+  exact: filt_big_and.
+by apply: filter_imp => y limFe_y i; apply: big_and_proj limFe_y.
 Qed.
 
-Lemma proj_le (F1 F2 : ('rV[T]_n -> Prop) -> Prop) :
+Lemma proj_le (F1 F2 : set (set 'rV[T]_n)) :
   filter_le F1 F2 -> forall i, filter_le (proj F1 i) (proj F2 i).
 Proof. by move=> F1leF2 ?? /F1leF2. Qed.
 
-Lemma close_vlim (F1 F2 : ('rV[T]_n -> Prop) -> Prop) :
+Lemma close_vlim (F1 F2 : set (set 'rV[T]_n)) :
   filter_le F1 F2 -> filter_le F2 F1 -> close (vlim F1) (vlim F2).
 Proof. by move=> ????; rewrite !mxE; apply: close_lim; apply: proj_le. Qed.
 
@@ -464,70 +403,47 @@ Definition vnorm_factor := (@norm_factor _ V).
 
 Lemma vnorm_triangle x y : vnorm (plus x y) <= vnorm x + vnorm y.
 Proof.
-  apply: Rle_trans.
-    apply: bigRmax_le_compat.
-    move=> i.
-    rewrite mxE.
-    exact: norm_triangle.
-  apply: bigRmax_le_ndec=> [i|i|a b c|a b c].
-  - exact: norm_ge_0.
-  - exact: norm_ge_0.
-  - move=> cge0 [age0 aleb].
-    split; first exact: Rplus_le_le_0_compat.
-    exact: Rplus_le_compat_r.
-  - move=> cge0 [age0 aleb].
-    split; first exact: Rplus_le_le_0_compat.
-    exact: Rplus_le_compat_l.
+suff : \big[Rmax/0]_i (norm (x ord0 i) + norm (y ord0 i)) <= vnorm x + vnorm y.
+  apply: Rle_trans; apply: bigRmax_le_compat => i; rewrite mxE.
+  exact: norm_triangle.
+apply: bigRmax_le_ndec=> [i|i|a b c|a b c]; try exact: norm_ge_0.
+ move=> cge0 [age0 aleb]; split; first exact: Rplus_le_le_0_compat.
+ exact: Rplus_le_compat_r.
+move=> cge0 [age0 aleb]; split; first exact: Rplus_le_le_0_compat.
+exact: Rplus_le_compat_l.
 Qed.
 
 Lemma vnorm_scal l x : vnorm (scal l x) <= abs l * vnorm x.
 Proof.
-  apply: Rle_trans.
-    apply: bigRmax_le_compat.
-    move=> i.
-    rewrite mxE.
-    exact: norm_scal.
-  apply: bigRmax_opconst_l.
-  - by move=> i; apply: norm_ge_0.
-  - exact: abs_ge_0.
-  - move=> a b c cge0 [age0 aleb].
-    split.
-      rewrite -[X in X <= _](Rmult_0_l 0).
-      by apply: Rmult_le_compat=> //; apply: Rle_refl.
-    exact: Rmult_le_compat_l.
+suff : \big[Rmax/0]_i (abs l * norm (x ord0 i)) <= abs l * vnorm x.
+  apply: Rle_trans; apply: bigRmax_le_compat => i; rewrite mxE.
+  exact: norm_scal.
+apply: bigRmax_opconst_l => [i||a b c cge0 [age0 aleb]]; first exact: norm_ge_0.
+  exact: abs_ge_0.
+by split; [apply: Rmult_le_pos|apply: Rmult_le_compat_l].
 Qed.
 
 Lemma vnorm_lt_ball x y eps : vnorm (minus y x) < eps -> ball x eps y.
 Proof.
-  move=> hxy i.
-  apply: norm_compat1.
-  apply: Rle_lt_trans hxy.
-  rewrite /vnorm (eq_bigr (fun i => norm (minus (y ord0 i) (x ord0 i)))).
-    apply: leq_bigRmax.
-    by move=> ?; apply: norm_ge_0.
-  by move=> ? _; rewrite !mxE.
+move=> xy_e i; apply: norm_compat1; apply: Rle_lt_trans xy_e.
+rewrite /vnorm (eq_bigr (fun i => norm (minus (y ord0 i) (x ord0 i)))).
+  by apply: leq_bigRmax => ?; apply: norm_ge_0.
+by move=> ? _; rewrite !mxE.
 Qed.
 
 Lemma ball_vnorm_lt (x y : 'rV[V]_n) (eps : posreal) :
   ball x eps y -> vnorm (minus y x) < vnorm_factor * eps.
 Proof.
-  move=> hxy.
-  rewrite /vnorm unlock /=.
-  elim: (index_enum _)=> /= [|i r hr].
-    apply: Rmult_lt_0_compat; first exact: norm_factor_gt_0.
-    by case eps.
-  apply/Rmax_Rlt; split=> //.
-  rewrite !mxE.
-  exact: norm_compat2.
+move=> xe_y; rewrite /vnorm unlock.
+elim: (index_enum _)=> /= [|i r hr].
+  by apply: Rmult_lt_0_compat; [apply: norm_factor_gt_0|apply: cond_pos].
+by apply/Rmax_Rlt; split=> //; rewrite !mxE; apply: norm_compat2.
 Qed.
 
 Lemma vnorm_eq0 x : vnorm x = 0 -> x = zero.
 Proof.
-  move/bigRmax_eq0=> nxeq0.
-  apply/matrixP=> i j.
-  rewrite [RHS]mxE ord1.
-  apply/norm_eq_zero/nxeq0.
-  by move=> k; apply: norm_ge_0.
+move/bigRmax_eq0=> nxeq0; apply/matrixP=> i j; rewrite [RHS]mxE ord1.
+by apply/norm_eq_zero/nxeq0 => ?; apply: norm_ge_0.
 Qed.
 
 End vectNormedModule.
@@ -550,16 +466,12 @@ Canonical vect_CompleteNormedModule (K : AbsRing) (V : CompleteNormedModule K)
 Lemma vect_hausdorff (U : UniformSpace) (n : nat) :
   hausdorff U -> hausdorff (vect_UniformSpace U n).
 Proof.
-  move=> hU x y hxy.
-  apply/matrixP=> i j.
-  rewrite ord1 {i}.
-  apply: hU.
-  move=> P Q hP hQ.
-  set f := fun z : 'rV[U]_n => z ord0 j.
-  have hf z : continuous f z.
-    move=> R [eps heps]; exists eps=> t ht.
-    exact/heps/ht.
-  suff : nonempty (setI (preimage f P) (preimage f Q)).
-    by move=> [z]; exists (f z).
-  by apply: hxy; apply: locally_preimage.
+move=> hU x y clx_y; apply/matrixP=> i j; rewrite ord1 {i}.
+apply: hU => A B xj_A yj_B.
+set f := fun z : 'rV[U]_n => z ord0 j.
+have fcont z : continuous f z.
+  by move=> C [eps fzeps_C]; exists eps=> t zeps_t; apply/fzeps_C/zeps_t.
+suff : nonempty (setI (preimage f A) (preimage f B)).
+  by move=> [z]; exists (f z).
+by apply: clx_y; apply: locally_preimage.
 Qed.
