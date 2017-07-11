@@ -1,5 +1,5 @@
 Require Import Reals.
-From Coquelicot Require Import Hierarchy Rcomplements Continuity.
+From Coquelicot Require Import Hierarchy Rcomplements Continuity Derive.
 From mathcomp Require Import ssreflect ssrfun eqtype ssrbool ssrnat bigop ssralg
   matrix fintype zmodp.
 Require Import coquelicotComplements.
@@ -121,6 +121,10 @@ Qed.
 Lemma leq_bigRmax (I : finType) (F : I -> R) :
   (forall i, 0 <= F i) -> forall i, F i <= \big[Rmax/0]_i F i.
 Proof. by move=> Fge0 i; rewrite (bigRmaxD1 i) //; apply: Rmax_l. Qed.
+
+Lemma bigRmax_leq (I : finType) (F : I -> R) (x : R) :
+  (forall i, 0 <= F i) -> \big[Rmax/0]_j F j <= x -> forall i, F i <= x.
+Proof. by move=> Fge0 leFx i; apply: Rle_trans leFx; apply: leq_bigRmax. Qed.
 
 Lemma bigRmax_le_compat (I : finType) (F1 F2 : I -> R) :
   (forall i, F1 i <= F2 i) -> \big[Rmax/0]_i (F1 i) <= \big[Rmax/0]_i (F2 i).
@@ -474,4 +478,17 @@ have fcont z : continuous f z.
 suff : nonempty (setI (preimage f A) (preimage f B)).
   by move=> [z]; exists (f z).
 by apply: clx_y; apply: locally_preimage.
+Qed.
+
+Lemma is_derive_component (K : AbsRing) (V : NormedModule K) n
+  (f : K -> 'rV[V]_n) i (x : K) (p : 'rV[V]_n) :
+  is_derive f x p -> is_derive (fun y => (f y) ord0 i) x (p ord0 i).
+Proof.
+move=> [_ f'xp]; split; first exact: is_linear_scal_l.
+move=> y /f'xp x_dom_my eps; have {x_dom_my} [e xe_dom_my] := x_dom_my eps.
+exists e => z /xe_dom_my /bigRmax_leq f'xpi.
+have : forall i,
+  0 <= norm ((minus (minus (f z) (f y)) (scal (minus z y) p)) ord0 i).
+  by move=> ?; apply: norm_ge_0.
+by move=> /f'xpi /(_ i); rewrite !mxE.
 Qed.
