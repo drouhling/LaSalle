@@ -480,15 +480,24 @@ suff : nonempty (setI (preimage f A) (preimage f B)).
 by apply: clx_y; apply: locally_preimage.
 Qed.
 
+Lemma is_linear_component (K : AbsRing) (V : NormedModule K) n i :
+  is_linear (fun p : 'rV[V]_n => p ord0 i).
+Proof.
+split; try by move=> ??; rewrite mxE.
+exists 1; split; first exact: Rlt_0_1.
+by move=> p; rewrite Rmult_1_l; apply: leq_bigRmax => j; apply: norm_ge_0.
+Qed.
+
+Lemma filterdiff_component (K : AbsRing) (V : NormedModule K) n i F :
+  filterdiff (fun p : 'rV[V]_n => p ord0 i) F (fun p => p ord0 i).
+Proof. exact/filterdiff_linear/is_linear_component. Qed.
+
 Lemma is_derive_component (K : AbsRing) (V : NormedModule K) n
   (f : K -> 'rV[V]_n) i (x : K) (p : 'rV[V]_n) :
   is_derive f x p -> is_derive (fun y => (f y) ord0 i) x (p ord0 i).
 Proof.
-move=> [_ f'xp]; split; first exact: is_linear_scal_l.
-move=> y /f'xp x_dom_my eps; have {x_dom_my} [e xe_dom_my] := x_dom_my eps.
-exists e => z /xe_dom_my /bigRmax_leq f'xpi.
-have : forall i,
-  0 <= norm ((minus (minus (f z) (f y)) (scal (minus z y) p)) ord0 i).
-  by move=> ?; apply: norm_ge_0.
-by move=> /f'xpi /(_ i); rewrite !mxE.
+move=> f'xp.
+have : forall k, (scal k p) ord0 i = scal k (p ord0 i) by move=> ?; rewrite mxE.
+apply: filterdiff_ext_lin.
+exact: filterdiff_comp f'xp (filterdiff_component i _).
 Qed.
