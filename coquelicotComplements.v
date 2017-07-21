@@ -1,4 +1,4 @@
-Require Import Reals.
+Require Import Reals Lra.
 From Coquelicot Require Import Hierarchy Derive Continuity Rbar Lub
   Rcomplements Lim_seq.
 From mathcomp Require Import ssreflect ssrnat ssrbool ssrfun.
@@ -169,6 +169,18 @@ Proof. by move=> sXY [x Xx]; exists x; apply: sXY. Qed.
 
 Lemma subset_trans A (Y X Z : set A) : X `<=` Y -> Y `<=` Z -> X `<=` Z.
 Proof. by move=> sXY sYZ ? ?; apply/sYZ/sXY. Qed.
+
+Lemma subsetI_eq A (X Y : set A) : X `<=` Y -> X `&` Y = X.
+Proof.
+move=> sXY; apply/funext=> a; apply/propext; split; first by move=> [].
+by move=> Xa; split=> //; apply: sXY.
+Qed.
+
+Lemma subsetIl A (X Y : set A) : X `&` Y `<=` X.
+Proof. by move=> ? []. Qed.
+
+Lemma subsetIr A (X Y : set A) : X `&` Y `<=` Y.
+Proof. by move=> ? []. Qed.
 
 Lemma nonempty_preimage_setI A B (f : A -> B) (X Y : set B) :
   (f @^-1` (X `&` Y)) !=set0 <-> (f @^-1` X `&` f @^-1` Y) !=set0.
@@ -375,6 +387,10 @@ exists r; split=> //; apply/peps_B.
 rewrite [X in ball _ X]double_var.
 exact: ball_triangle qr_heps.
 Qed.
+
+Lemma closure_setI (A B : set U) :
+  closure (A `&` B) `<=` closure A `&` closure B.
+Proof. by move=> p clABp; split=> ? /clABp [q [[]]]; exists q. Qed.
 
 Lemma closure_bigcap I (F : set I) (f : I -> set U) :
   closure (\bigcap_(A in F) f A) `<=` \bigcap_(A in F) closure (f A).
@@ -615,6 +631,9 @@ Proof. by move=> sGF p Fp P Q GP Qp; apply: Fp Qp; apply: sGF. Qed.
 
 Definition compact A := forall (F : set (set U)), F A ->
   ProperFilter F -> A `&` cluster F !=set0.
+
+Lemma compact_set0 : compact set0.
+Proof. by move=> F Fset0 Fproper; have /filter_ex [] := Fset0. Qed.
 
 Lemma subclosed_compact (A B : set U) :
   is_closed A -> compact B -> A `<=` B -> compact A.
@@ -909,6 +928,220 @@ Qed.
 
 End Compactness.
 
+Lemma ub_finlub (A : set R) :
+  A !=set0 -> (exists M, A `<=` Rlt^~ M) ->
+  exists l, is_lub_Rbar A (Finite l).
+Proof.
+move=> [p Ap] [M sAltM]; have lubAlub := Lub_Rbar_correct A.
+have lubleM : Rbar_le (Lub_Rbar A) M.
+  by apply: (proj2 lubAlub) => q Aq /=; apply/Rlt_le/sAltM.
+case: (Lub_Rbar A) lubAlub lubleM=> //; first by move=> l; exists l.
+by move=> [] infty_lub; have := infty_lub p Ap.
+Qed.
+
+Lemma lubE (A : set R) (x : R) :
+  is_lub_Rbar A x -> forall e : posreal, exists y, A y /\ y <= x < y + e.
+Proof.
+move=> xlub e; apply: NNPP => /not_ex_all_not xnlub.
+have /Rle_not_lt : Rbar_le x (x - e).
+  apply: (proj2 xlub) => y Ay; apply/Rle_minus_r.
+  have /not_and_or /or_to_imply /(_ Ay) /not_and_or := xnlub y.
+  by apply: or_ind; [have /(proj1 xlub) := Ay|apply: Rnot_lt_le].
+apply; apply/Rminus_lt.
+rewrite /Rminus Rplus_comm -Rplus_assoc [- _ + _]Rplus_comm Rplus_opp_r
+        Rplus_0_l.
+exact/Ropp_lt_gt_0_contravar/cond_pos.
+Qed.
+
+Lemma lb_finglb (A : set R) :
+  A !=set0 -> (exists M, A `<=` Rlt M) ->
+  exists l, is_glb_Rbar A (Finite l).
+Proof.
+move=> [p Ap] [M sAMlt].
+have glbAglb := Glb_Rbar_correct A.
+have Mleglb : Rbar_le M (Glb_Rbar A).
+  apply: (proj2 glbAglb); move=> q Aq /=; exact/Rlt_le/sAMlt.
+case: (Glb_Rbar A) glbAglb Mleglb=> //; first by move=> l; exists l.
+by move=> [] infty_glb; have := infty_glb p Ap.
+Qed.
+
+Lemma glbE (A : set R) (x : R) :
+  is_glb_Rbar A x -> forall e : posreal, exists y, A y /\ y - e < x <= y.
+Proof.
+move=> xglb e; apply: NNPP => /not_ex_all_not xnglb.
+have /Rle_not_lt : Rbar_le (x + e) x.
+  apply: (proj2 xglb) => y Ay; apply/Rle_minus_r.
+  have /not_and_or /or_to_imply /(_ Ay) /not_and_or := xnglb y.
+  by apply: or_ind; [apply: Rnot_lt_le|have /(proj1 xglb) := Ay].
+apply; apply/Rminus_lt; ring_simplify.
+exact/Ropp_lt_gt_0_contravar/cond_pos.
+Qed.
+
+Definition connected (U : UniformSpace) (A : set U) :=
+  forall B : set U, B !=set0 -> B `<=` A -> (exists C, open C /\ B = A `&` C) ->
+  (exists C, is_closed C /\ B = A `&` C) -> B = A.
+
+Lemma seg_connected a b : connected (seg a b).
+Proof.
+case: (Rle_lt_dec a b) => [aleb|blta]; last first.
+  suff -> : seg a b = set0 by move=> A [x Ax] /(_ _ Ax).
+  apply/funext => x; apply/propext; split => // - [alex].
+  by apply: Rlt_not_le; apply: Rlt_le_trans alex.
+move=> A [y Ay] sA_seg_ab Aop [B [Bcl A_eq_abB]]; move: Aop.
+apply: NNPP => /(imply_to_and _ (_ = _)) [[C [Cop A_eq_abC]] A_ne_ab].
+have [x [[alex xleb] nAx]] : exists x, seg a b x /\ ~ A x.
+  apply: NNPP => /not_ex_all_not A_eq_ab; apply: A_ne_ab.
+  apply/funext => x; apply/propext; split; first exact: sA_seg_ab.
+  move=> seg_abz; have /not_and_or := A_eq_ab x.
+  by apply: or_ind => //; apply: NNPP.
+case: (Rlt_le_dec y x) => [yltx|xley].
+  have ltx_n0 : A `&` Rlt^~ x !=set0 by exists y.
+  have /(ub_finlub ltx_n0) [z zlub] : exists M, A `&` Rlt^~ x `<=` Rlt^~ M.
+    by exists x => ? [].
+  have ylez : Rbar_le y z by apply: (proj1 zlub).
+  have zlex : Rbar_le z x by apply: (proj2 zlub) => ? [_]; apply: Rlt_le.
+  have Az : A z.
+    rewrite A_eq_abB; split.
+      split; last exact: Rle_trans xleb.
+      apply: Rle_trans ylez.
+      by have := Ay; rewrite A_eq_abB => - [[]].
+    apply: Bcl => D [e ze_D].
+    have /lubE /(_ e) [t [[At tltx] [tlez zlttpe]]] := zlub.
+    exists t; split; first by move: At; rewrite A_eq_abB => - [].
+    apply/ze_D/ball_sym/Rabs_def1.
+      by apply/Rlt_minus_l; rewrite Rplus_comm.
+    apply/Rlt_minus_r; apply: Rlt_le_trans tlez.
+    rewrite -[X in _ < X]Rplus_0_l; apply: Rplus_lt_compat_r.
+    exact/Ropp_lt_gt_0_contravar/cond_pos.
+  have zltx : 0 < x - z.
+    apply/Rlt_Rminus; case/Rle_lt_or_eq_dec: zlex => // zeqx; exfalso.
+    by apply: nAx; rewrite -zeqx.
+  have := Az; rewrite A_eq_abC => - [_ /Cop [e ze_C]].
+  suff [t [Altx_t]] : exists t, (A `&` Rlt^~ x) t /\ z < t.
+    exact/Rle_not_lt/(proj1 zlub).
+  have min_pos : 0 < Rmin (e / 2) ((x - z) / 2).
+    by apply: Rmin_pos; apply: Rdiv_lt_0_compat Rlt_0_2 => //; apply: cond_pos.
+  exists (z + (Rmin (e / 2) ((x - z) / 2))); split; last first.
+    by rewrite -[X in X < _]Rplus_0_r; apply: Rplus_lt_compat_l.
+  split; last first.
+    rewrite Rplus_comm; apply/Rlt_minus_r; apply: Rle_lt_trans (Rmin_r _ _) _.
+    lra.
+  rewrite A_eq_abC; split; last first.
+    apply/ze_C/Rabs_lt_between'; split; apply: Rplus_lt_compat_l.
+      by apply: Rlt_trans min_pos; apply/Ropp_lt_gt_0_contravar/cond_pos.
+    by have egt0 := cond_pos e; apply: Rle_lt_trans (Rmin_l _ _) _; lra.
+  split.
+    rewrite -[X in X <= _]Rplus_0_r; apply: Rplus_le_compat; last exact: Rlt_le.
+    by have := Az; rewrite A_eq_abC => - [[]].
+  apply: Rle_trans xleb; rewrite Rplus_comm; apply/Rle_minus_r.
+  by apply: Rle_trans (Rmin_r _ _) _; lra.
+case/Rle_lt_or_eq_dec: xley => [xlty|xeqy]; last by apply: nAx; rewrite xeqy.
+have xlt_n0 : A `&` Rlt x !=set0 by exists y.
+have /(lb_finglb xlt_n0) [z zglb] : exists M, A `&` Rlt x `<=` Rlt M.
+  by exists x => ? [].
+have zley : Rbar_le z y by apply: (proj1 zglb).
+have xlez : Rbar_le x z by apply: (proj2 zglb) => ? [_]; apply: Rlt_le.
+have Az : A z.
+  rewrite A_eq_abB; split.
+    split; first exact: Rle_trans xlez.
+    by apply: Rle_trans zley _; have := Ay; rewrite A_eq_abB => - [[]].
+  apply: Bcl => D [e ze_D].
+  have /glbE /(_ e) [t [[At xltt] [tmeltz zlet]]] := zglb.
+  exists t; split; first by move: At; rewrite A_eq_abB => - [].
+  apply/ze_D/Rabs_def1.
+    by apply/Rlt_minus_l; have /Rlt_minus_l := tmeltz; rewrite Rplus_comm.
+  apply/Rlt_minus_r; apply: Rlt_le_trans zlet.
+  rewrite -[X in _ < X]Rplus_0_l; apply: Rplus_lt_compat_r.
+  exact/Ropp_lt_gt_0_contravar/cond_pos.
+have xltz : 0 < z - x.
+  apply/Rlt_Rminus; case/Rle_lt_or_eq_dec: xlez => // zeqx; exfalso.
+  by apply: nAx; rewrite zeqx.
+have := Az; rewrite A_eq_abC => - [_ /Cop [e ze_C]].
+suff [t [Axlt_t]] : exists t, (A `&` Rlt x) t /\ t < z.
+  exact/Rle_not_lt/(proj1 zglb).
+have min_pos : 0 < Rmin (e / 2) ((z - x) / 2).
+  by apply: Rmin_pos; apply: Rdiv_lt_0_compat Rlt_0_2 => //; apply: cond_pos.
+exists (z - (Rmin (e / 2) ((z - x) / 2))); split; last first.
+  rewrite -[X in _ < X]Rplus_0_r; apply: Rplus_lt_compat_l.
+  exact: Ropp_lt_gt_0_contravar.
+split; last first.
+  apply/Rlt_minus_r; rewrite Rplus_comm; apply/Rlt_minus_r.
+  by apply: Rle_lt_trans (Rmin_r _ _) _; lra.
+rewrite A_eq_abC; split; last first.
+  apply/ze_C/Rabs_lt_between'; split; apply: Rplus_lt_compat_l.
+    apply: Ropp_lt_contravar; apply: Rle_lt_trans (Rmin_l _ _) _.
+    by have egt0 := cond_pos e; lra.
+  by apply: Rlt_trans (cond_pos _); apply: Ropp_lt_gt_0_contravar.
+split; last first.
+  rewrite -[X in _ <= X]Rplus_0_r; apply: Rplus_le_compat; last first.
+    by apply/Rlt_le/Ropp_lt_gt_0_contravar.
+  by have := Az; rewrite A_eq_abC => - [[]].
+apply: Rle_trans alex _.
+apply/Rle_minus_r; rewrite Rplus_comm; apply/Rle_minus_r.
+by apply: Rle_trans (Rmin_r _ _) _; lra.
+Qed.
+
+Lemma seg_compact a b : compact (seg a b).
+Proof.
+case: (Rle_lt_dec a b) => [aleb|blta]; last first.
+  suff -> : seg a b = set0 by exact: compact_set0.
+  apply/funext => x; apply/propext; split => // - [alex].
+  by apply: Rlt_not_le; apply: Rlt_le_trans alex.
+apply/compactP => I f opf cov_abf.
+set B := [set x | exists g : finite_family R I, sub_family f g /\
+  cover (seg a x) g /\ union_fam g x].
+set A := seg a b `&` B.
+have An0 : A !=set0.
+  have seg_aba : seg a b a by split; [apply: Rle_refl|].
+  exists a; split=> //; have /cov_abf [j fij fja] := seg_aba.
+  exists (Ff (finfam_sing j f)); split; first by split=> // _ ->.
+  by split; [move=> _ /Rle_le_eq <-; exists j|exists j].
+have Bop : open B.
+  move=> x [g [[ind_sgf fieqgi] [cov_axg [j gij gjx]]]].
+  have /(_ _ gjx) [e xe_gj] : open (g j).
+    have <- : f j = g j.
+      by apply/funext => y; apply/propext; move : y; apply: fieqgi.
+    exact/opf/ind_sgf.
+  exists e => y xe_y; have /xe_gj gjy := xe_y; exists g; split => //.
+  split; last by exists j.
+  move=> z [alez zley].
+  case: (Rle_lt_dec z x) => [zlex|xltz]; first exact: cov_axg.
+  exists j => //; apply/xe_gj.
+  rewrite /ball /= /AbsRing_ball /= /abs /= Rabs_pos_eq; last first.
+    exact/Rlt_le/Rlt_Rminus.
+  apply/Rlt_minus_l; apply: Rle_lt_trans zley _; rewrite Rplus_comm.
+  by have /Rabs_lt_between' [] := xe_y.
+have Acl : is_closed A.
+  move=> x clAx.
+  have [alex xleb] : seg a b x.
+    by apply: seg_closed; have /closure_setI [] := clAx.
+  split => //.
+  have [j fij fjx] : union_fam f x by apply: cov_abf.
+  have /opf /(_ _ fjx) [e xe_fj] := fij.
+  have /clAx [y [[seg_aby [g [[in_sgf gieqfi] [cov_ayg _]]]] xe_y]] :=
+    locally_ball x e.
+  exists (Ff (finfamU g (Ff (finfam_sing j f)) f)); split=> /=.
+    split=> // k; apply: or_ind=> [/in_sgf|->] //.
+  split; last by exists j => //; right.
+  move=> z [alez zlex].
+  case: (Rle_lt_dec z y) => [zley|yltz].
+    have /cov_ayg [k gik gkz] : seg a y z by [].
+    by exists k; [left|apply/gieqfi].
+  exists j; first by right.
+  apply/xe_fj/ball_sym.
+  rewrite /ball /= /AbsRing_ball /= /abs /= Rabs_pos_eq; last first.
+    exact/(Rminus_le_0 z).
+  apply/Rlt_minus_l; rewrite Rplus_comm; apply/Rlt_minus_l.
+  by apply: Rlt_trans yltz; have /Rabs_lt_between' [] := xe_y.
+have Aeq_seg_ab : A = seg a b.
+  apply: seg_connected An0 (@subsetIl _ _ _) _ _; first by exists B.
+  exists A; split=> //.
+  by rewrite setIC; apply/eq_sym/subsetI_eq/(@subsetIl _ (seg _ _) _).
+have [_ [g [? []]]] : A b.
+  by rewrite Aeq_seg_ab; split; [|apply: Rle_refl].
+by exists g.
+Qed.
+
 Lemma map_sub_cluster (U V : UniformSpace) (F : set (set U)) (f : U -> V)
   (A : set U) : Filter F -> continuous_on A f -> F A -> is_closed A ->
   f @` (cluster F) `<=` cluster (f @ F).
@@ -1064,50 +1297,20 @@ Qed.
 
 Section Monotonicity.
 
-Lemma ub_finlub (A : set R) :
-  A !=set0 -> (exists M, A `<=` Rlt ^~ M) ->
-  exists l, is_lub_Rbar A (Finite l).
-Proof.
-move=> [p Ap] [M hM].
-have lubAlub := Lub_Rbar_correct A.
-have lubleM : Rbar_le (Lub_Rbar A) M.
-  apply: (proj2 lubAlub).
-  move=> q Aq /=.
-  exact/Rlt_le/hM.
-case: (Lub_Rbar A) lubAlub lubleM=> //; first by move=> l; exists l.
-by move=> [] hA; have := hA p Ap.
-Qed.
-
 Lemma ndecr_ub_cvg (f : R -> R) :
   (forall x y, 0 <= x <= y -> f x <= f y) ->
   (exists M, f @` Rle 0 `<=` Rlt^~ M) -> [cvg f @ +oo].
 Proof.
 have fRn0 : f @` Rle 0 !=set0 by exists (f 0); apply/imageP/Rle_refl.
-move=> fndecr /(ub_finlub fRn0) [l [ubl lubl]].
-exists l=> A [eps heps].
-suff [x [xge0 hx]] : exists x, 0 <= x /\ l - (f x) < eps.
-  exists x=> y ltxy.
-  apply: heps.
+move=> fndecr /(ub_finlub fRn0) [l llub]; exists l=> A [e le_A].
+suff [x [xge0 lmfx_lte]] : exists x, 0 <= x /\ l - (f x) < e.
+  exists x => y ltxy; apply: le_A.
   rewrite /ball /= /AbsRing_ball abs_minus /abs /= Rabs_pos_eq -?Rminus_le_0.
-    apply/(Rle_lt_trans _ _ _ _ hx)/Rplus_le_compat_l/Ropp_le_contravar.
+    apply/(Rle_lt_trans _ _ _ _ lmfx_lte)/Rplus_le_compat_l/Ropp_le_contravar.
     by apply: fndecr; split=> //; apply: Rlt_le.
-  apply/ubl/imageP/Rlt_le.
-  exact: Rle_lt_trans ltxy.
-apply: NNPP.
-move/not_ex_all_not=> hf.
-have : Rbar_le l (l - eps).
-  apply: lubl.
-  move=> _ [x xge0 <-] /=.
-  apply/Rle_minus_r.
-  rewrite Rplus_comm.
-  apply/Rle_minus_r/Rnot_lt_le.
-  have /not_and_or /or_to_imply := hf x.
-  by move=> /(_ xge0).
-move/Rle_not_lt=> hleps.
-apply/hleps/Rminus_lt.
-rewrite /Rminus Rplus_comm -Rplus_assoc [- _ + _]Rplus_comm Rplus_opp_r
-        Rplus_0_l.
-by apply: Ropp_lt_gt_0_contravar; case: eps heps hf hleps.
+  by apply/(proj1 llub)/imageP/Rlt_le; apply: Rle_lt_trans ltxy.
+have /lubE /(_ e) [_ [[x xge0 <-] [fxlel lltfxpe]]] := llub.
+by exists x; split=> //; apply/Rlt_minus_l; rewrite Rplus_comm.
 Qed.
 
 Lemma nincr_lb_cvg (f : R -> R) :
