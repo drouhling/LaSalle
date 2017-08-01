@@ -118,6 +118,40 @@ Notation "f @^-1` A" := (preimage f A) (at level 24) : classical_set_scope.
 Notation "f @` A" := (image f A) (at level 24) : classical_set_scope.
 Notation "A !=set0" := (nonempty A) (at level 80) : classical_set_scope.
 
+Lemma preimage_image A B (f : A -> B) (X : set A) : X `<=` f@^-1` (f @` X).
+Proof. by move=> a Xa; exists a. Qed.
+
+Lemma image_preimage A B (f : A -> B) (X : set B) :
+  f @` setT = setT -> f @` (f @^-1` X) = X.
+Proof.
+move=> fsurj; apply/funext=> x; apply/propext; split; first by move=> [?? <-].
+move=> Xx; have : setT x by [].
+by rewrite -fsurj => - [y _ fy_eqx]; exists y => //; rewrite /preimage fy_eqx.
+Qed.
+
+Lemma preimage_setT A B (f : A -> B) : f @^-1` setT = setT.
+Proof. by apply/funext=> ?; apply/propext. Qed.
+
+Lemma preimage_setI A B (f : A -> B) (X Y : set B) :
+  f @^-1` (X `&` Y) = (f @^-1` X) `&` (f @^-1` Y).
+Proof. by apply/funext=> ?; apply/propext; split=> [[]|[]]. Qed.
+
+Lemma preimage_setC A B (f : A -> B) (X : set B) :
+  ~` (f @^-1` X) = f @^-1` (~` X).
+Proof.
+apply/funext=> a; apply/propext.
+by split=> npreimXa preimXa; apply: npreimXa.
+Qed.
+
+Lemma setIT A (X : set A) : X `&` setT = X.
+Proof. by apply/funext=> a; apply/propext; split=> [[]|]. Qed.
+
+Lemma setTI A (X : set A) : setT `&` X = X.
+Proof. by apply/funext=> a; apply/propext; split=> [[]|]. Qed.
+
+Lemma setIA A (X Y Z : set A) : X `&` Y `&` Z = X `&` (Y `&` Z).
+Proof. by apply/funext=> a; apply/propext; split=> [[[]]|[? []]]. Qed.
+
 Lemma setIC A (X Y : set A) : X `&` Y = Y `&` X.
 Proof. by apply/funext => ?; apply/propext; apply: and_comm. Qed.
 
@@ -184,7 +218,7 @@ Proof. by move=> ? []. Qed.
 
 Lemma nonempty_preimage_setI A B (f : A -> B) (X Y : set B) :
   (f @^-1` (X `&` Y)) !=set0 <-> (f @^-1` X `&` f @^-1` Y) !=set0.
-Proof. by split; case=> x ?; exists x. Qed.
+Proof. by rewrite preimage_setI. Qed.
 
 Lemma subsetC A (X Y : set A) : X `<=` Y -> ~` Y `<=` ~` X.
 Proof. by move=> sXY ? nYa ?; apply/nYa/sXY. Qed.
@@ -202,6 +236,30 @@ Lemma Dempty_subset A (X Y : set A) : X `\` Y = set0 -> X `<=` Y.
 Proof.
 move=> XDY0 a Xa; apply: NNPP=> /(conj Xa).
 by rewrite -[_ /\ _]/((_ `\` _) _) XDY0.
+Qed.
+
+Lemma bigcupI A I J (X : I -> set A) (Y : J -> set A) (KI : set I)
+  (KJ : set J) :
+  (\bigcup_(i in KI) X i) `&` (\bigcup_(j in KJ) Y j) =
+  \bigcup_(ij in [set ij | KI ij.1 /\ KJ ij.2]) (X ij.1 `&` Y ij.2).
+Proof.
+apply/funext=> a; apply/propext; split.
+  by move=> [[i KIi Xia] [j KJj Yja]]; exists (i, j).
+by move=> [ij [KIij1 KJij2] [Xij1a Yij2a]]; split; [exists ij.1|exists ij.2].
+Qed.
+
+Lemma bigcapI A I J (X : I -> set A) (Y : J -> set A) (KI : set I)
+  (KJ : set J) :
+  (\bigcap_(i in KI) X i) `&` (\bigcap_(j in KJ) Y j) =
+  \bigcap_(ij in [set ij : I + J | match ij with | inl i => KI i
+                                                 | inr j => KJ j end])
+    (match ij with | inl i => X i
+                   | inr j => Y j end).
+Proof.
+apply/funext=> a; apply/propext; split.
+  by move=> [XIa YIa]; case=> ??; [apply: XIa|apply: YIa].
+by move=> XYIa; split=> [i KIi|j KJj];
+  [apply: (XYIa (inl i))|apply: (XYIa (inr j))].
 Qed.
 
 Structure canonical_filter_on X Y := CanonicalFilterOn {
@@ -588,8 +646,7 @@ Qed.
 End famille.
 (* *)
 
-Lemma filter_bigcap (U : UniformSpace) I (G : set I) (f : I -> set U)
-  (F : set (set U)) :
+Lemma filter_bigcap U I (G : set I) (f : I -> set U) (F : set (set U)) :
   Filter F -> finite_set G -> (forall i, G i -> F (f i)) ->
   F (\bigcap_(i in G) f i).
 Proof.
@@ -605,8 +662,7 @@ apply: filter_and; first by apply: sfGF; left.
 by apply: (ihl (In(A:=I)^~ l))=> // i li; apply: sfGF; right.
 Qed.
 
-Lemma filter_finite_inter (U : UniformSpace) (F : set (set U)) Ti
-  (f : family U Ti) :
+Lemma filter_finite_inter U (F : set (set U)) Ti (f : family U Ti) :
   ProperFilter F -> (forall i, i \ins (ind f) -> F (f i)) -> finite_inter f.
 Proof.
 move=> Fproper sfF g [ind_sgf gieqfi]; apply: filter_ex.
@@ -797,8 +853,8 @@ move=> /not_all_ex_not [q] /(imply_to_and (A _)) [Aq hq]; exists q => k hik.
 by apply/Anfieqhi => //; split=> // fkq; apply: hq; exists k=> //; left.
 Qed.
 
-Lemma fin_inter_filter Ti (f : family U Ti) :
-  finite_inter f -> Filter (fun A => exists g : finite_family U Ti,
+Lemma fin_inter_filter T Ti (f : family T Ti) :
+  finite_inter f -> Filter (fun A => exists g : finite_family T Ti,
     sub_family f g /\ inter_fam g `<=` A).
 Proof.
 move=> ffin; split.
@@ -824,8 +880,8 @@ move=> ffin; split.
   by exists g; split=> //; apply: subset_trans sAB.
 Qed.
 
-Lemma fin_inter_proper Ti (f : family U Ti) :
-  finite_inter f -> ProperFilter (fun A => exists g : finite_family U Ti,
+Lemma fin_inter_proper T Ti (f : family T Ti) :
+  finite_inter f -> ProperFilter (fun A => exists g : finite_family T Ti,
     sub_family f g /\ inter_fam g `<=` A).
 Proof.
 move=> ffin.

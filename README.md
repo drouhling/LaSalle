@@ -18,8 +18,10 @@ It is organised as follows:
 - vect.v: in this file we prove that Mathematical Components' row vectors
   inherit Coquelicot's topological structures.
 
+- tychonoff.v: this file contains a proof of Tychonoff's theorem. (WIP)
+
 - pendulum.v : in this file we will apply LaSalles invariance principle to an
-  inverted pendulum (WIP)
+  inverted pendulum. (WIP)
 
 # Authors
 
