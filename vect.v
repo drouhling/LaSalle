@@ -126,6 +126,10 @@ Lemma bigRmax_leq (I : finType) (F : I -> R) (x : R) :
   (forall i, 0 <= F i) -> \big[Rmax/0]_j F j <= x -> forall i, F i <= x.
 Proof. by move=> Fge0 leFx i; apply: Rle_trans leFx; apply: leq_bigRmax. Qed.
 
+Lemma bigRmax_lt (I : finType) (F : I -> R) (x : R) :
+  0 < x -> (forall i, F i < x) -> \big[Rmax/0]_j F j < x.
+Proof. by move=> xgt0 ltFx; elim/big_ind: _ => // ??; apply: Rmax_lub_lt. Qed.
+
 Lemma bigRmax_le_compat (I : finType) (F1 F2 : I -> R) :
   (forall i, F1 i <= F2 i) -> \big[Rmax/0]_i (F1 i) <= \big[Rmax/0]_i (F2 i).
 Proof.

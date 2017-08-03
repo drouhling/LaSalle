@@ -1,9 +1,9 @@
-Require Import Reals Lra.
-From Coquelicot Require Import Hierarchy Rcomplements Continuity Rbar Derive
-  Lub.
+Require Import Reals.
 From mathcomp Require Import ssreflect ssrfun eqtype ssrbool ssrnat bigop ssralg
   matrix fintype zmodp seq.
-Require Import lasalle coquelicotComplements vect.
+Require Import lasalle tychonoff coquelicotComplements vect.
+From Coquelicot Require Import Hierarchy Rcomplements Continuity Rbar Derive
+  Lub.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -57,10 +57,6 @@ move=> Fproper x limFx f lf f'lf fcontx.
 apply: (filterdiff_comp _ (pow^~ n) _ (fun y => n * y * (f x) ^ n.-1) f'lf _).
 by apply: filterdiff_pow; apply: is_filter_lim_filtermap.
 Qed.
-
-Lemma is_filter_lim_locally (T : UniformSpace) (p : T) :
-  is_filter_lim (locally p) p.
-Proof. by []. Qed.
 
 Lemma filterdiff_pow_component n m (p : U) :
   filterdiff (fun q : U => q[n] ^ m) (locally p)
@@ -132,7 +128,195 @@ Hypothesis p0_valid : V p0 < B.
 Definition K : set U :=
   [set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1 /\ V p <= V p0].
 
+Lemma pow_continuous n x : continuous (pow^~ n) x.
+Proof.
+apply: filterdiff_continuous; exists (fun y => n * y * x ^ n.-1).
+exact/filterdiff_pow.
+Qed.
+
 Hint Resolve cond_pos.
+
+Lemma is_closed_circ : is_closed ([set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1]).
+Proof.
+move=> p clcircp; apply: Req_le_aux => e.
+have /pow_continuous [e1 p2e1_sp2he] :=
+  locally_ball (p[2] ^ 2) (mkposreal _ (is_pos_div_2 e)).
+have /pow_continuous [e2 p3e2_sp3he] :=
+  locally_ball (p[3] ^ 2) (mkposreal _ (is_pos_div_2 e)).
+have me12_gt0 : 0 < Rmin e1 e2 by apply: Rmin_pos.
+have [q [circq pme12_q]] :
+  [set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1] `&`
+  ball p (mkposreal _ me12_gt0) !=set0 by apply/clcircp/locally_ball.
+rewrite -circq /Rminus Ropp_plus_minus_distr Rplus_assoc
+  -[X in _ + X]Rplus_assoc [(p[3] ^ 2) + _]Rplus_comm Rplus_assoc -Rplus_assoc
+  [_ e]double_var.
+apply: Rle_trans (Rabs_triang _ _) _; apply: Rplus_le_compat; apply: Rlt_le.
+  rewrite Rabs_minus_sym; apply: p2e1_sp2he; apply: ball_le (Rmin_l _ e2) _ _.
+  exact: pme12_q.
+rewrite Rabs_minus_sym; apply: p3e2_sp3he; apply: ball_le (Rmin_r e1 _) _ _.
+exact: pme12_q.
+Qed.
+
+Lemma is_closed_Vpreim_leVp0 : is_closed (V @^-1` (Rle^~ (V p0))).
+Proof.
+apply: continuous_closed_preimage.
+  move=> p; apply: filterdiff_continuous; exists (V' p).
+  by apply: filterdiff_V.
+apply: closed_is_closed; apply: closed_le.
+Qed.
+
+Lemma is_closed_K : is_closed K.
+Proof. exact: is_closed_setI is_closed_circ is_closed_Vpreim_leVp0. Qed.
+
+Lemma bounded_poly a b c d :
+  0 < a -> exists M, forall x, a * (x ^ 2) - (b * Rabs x) - c < d -> Rabs x < M.
+Proof.
+move=> agt0.
+have ptoinfty : (fun x => a * (x ^ 2) - (b * Rabs x) - c) @ +oo --> +oo.
+  move=> A [M sgtMA].
+  exists (Rmax (sqrt (Rmax (M + c) 0)) (((sqrt (Rmax (M + c) 0)) + b) / a)).
+  move=> x /Rmax_Rlt [Mpcltx Mpcltaxpb]; apply: sgtMA.
+  have xgt0 : 0 < x by apply: Rle_lt_trans (sqrt_pos _) Mpcltx.
+  rewrite Rabs_pos_eq; last exact/Rlt_le.
+  apply/Rlt_minus_r.
+  rewrite /= Rmult_1_r -Rmult_assoc /Rminus Ropp_mult_distr_l
+    -Rmult_plus_distr_r.
+  have : sqrt (Rmax (M + c) 0) < a * x - b.
+    by rewrite Rmult_comm; apply/Rlt_minus_r/Rlt_div_l.
+  move=> {Mpcltaxpb} Mpcltaxpb; move: Mpcltx => /Rlt_le Mpclex.
+  apply: Rle_lt_trans (Rmult_lt_compat_r _ _ _  xgt0 Mpcltaxpb).
+  apply: Rle_trans (Rmult_le_compat_l _ _ _ (sqrt_pos _) Mpclex).
+  by rewrite sqrt_def; [apply: Rmax_l|apply: Rmax_r].
+have mtoinfty : (fun x => a * (x ^ 2) - (b * Rabs x) - c) @ -oo --> +oo.
+  move=> A /ptoinfty [M sgtMAp]; exists (- M) => x.
+  rewrite -[X in X < _]Ropp_involutive => /Ropp_lt_cancel /sgtMAp.
+  by rewrite -Rsqr_pow2 -Rsqr_neg Rsqr_pow2 Rabs_Ropp.
+rewrite /filter_le /filtermap /= in ptoinfty.
+have dleatinfty : [filter of +oo] (Rle d) by exists d => ? /Rlt_le.
+have /ptoinfty [M1 sgtM1dlep] := dleatinfty.
+have /mtoinfty [M2 sltM2dlep] := dleatinfty.
+exists ((Rmax M1 (- M2)) + 1) => x pxltd.
+apply: Rle_lt_trans (Rlt_plus_1 _); apply/Rnot_gt_le => /Rmax_Rlt [M1ltx M2ltx].
+move: pxltd; apply/Rge_not_lt/Rle_ge; case: (Rle_lt_dec 0 x) => [xge0|xlt0].
+  by apply: sgtM1dlep; rewrite -(Rabs_pos_eq _ xge0).
+by apply/sltM2dlep/Ropp_lt_cancel; rewrite -[X in _ < X](Rabs_left _ xlt0).
+Qed.
+
+Lemma is_bounded_K : is_bounded K.
+Proof.
+have [M1 K0123ltM1] : exists M1, forall p, K p ->
+  Rabs (p[0]) < M1 /\ Rabs (p[1]) < M1 /\ Rabs (p[2]) < M1 /\ Rabs (p[3]) < M1.
+  exists (Rmax 2 (Rmax (sqrt (2 * B / kv)) (sqrt (2 * B / kx)))).
+  move=> p [circp Vps]; split.
+    do 2 ?[apply: Rlt_le_trans (Rmax_r _ _)].
+    rewrite -sqrt_Rsqr_abs Rsqr_pow2; apply: sqrt_lt_1_alt.
+    split; first exact: pow2_ge_0.
+    apply/(Rlt_div_r (p[0] ^ 2)) => //.
+    rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
+    rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
+    apply: Rle_lt_trans p0_valid; apply: Rle_trans Vps.
+    rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat_r.
+    by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
+      apply: Rlt_le; apply: is_pos_div_2.
+  split.
+    apply: Rlt_le_trans (Rmax_r _ _); apply: Rlt_le_trans (Rmax_l _ _).
+    rewrite -sqrt_Rsqr_abs Rsqr_pow2; apply: sqrt_lt_1_alt.
+    split; first exact: pow2_ge_0.
+    apply/(Rlt_div_r (p[1] ^ 2)) => //.
+    rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
+    rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
+    apply: Rle_lt_trans p0_valid; apply: Rle_trans Vps.
+    rewrite -[X in X <= _]Rplus_0_l [X in _ <= X]Rplus_comm -Rplus_assoc.
+    apply: Rplus_le_compat_r.
+    by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
+      apply: Rlt_le; apply: is_pos_div_2.
+  split; apply: Rlt_le_trans (Rmax_l _ _); apply: Rle_lt_trans (Rlt_n_Sn _);
+    rewrite -sqrt_Rsqr_abs Rsqr_pow2 -sqrt_1 -circp;
+    apply: sqrt_le_1_alt.
+    rewrite -[X in X <= _]Rplus_0_r; apply: Rplus_le_compat_l.
+    exact: pow2_ge_0.
+  rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat_r.
+  exact: pow2_ge_0.
+suff [M2 K4ltM2] : exists M2, forall p, K p -> Rabs (p[4]) < M2.
+  exists (Rmax M1 M2) => p Kp.
+  have /K0123ltM1 [p0ltM1 [p1ltM1 [p2ltM1 p3ltM1]]] := Kp.
+  have /K4ltM2 p4ltM2 := Kp.
+  apply: bigRmax_lt.
+    apply: Rlt_le_trans (Rmax_l _ _); apply: Rle_lt_trans p0ltM1.
+    exact: Rabs_pos.
+  case; do 4 ?[case; first by move=> ?; rewrite -[Ordinal _]natr_Zp;
+    apply: Rlt_le_trans (Rmax_l _ _)].
+  case; last by move=> n ltnp5; exfalso; move: ltnp5; rewrite !ltnS ltn0.
+  by move=> ?; rewrite -[Ordinal _]natr_Zp; apply: Rlt_le_trans (Rmax_r _ _).
+have hmslgt0 : 0 < (m * (l ^ 2) / 2).
+  apply: Rdiv_lt_0_compat Rlt_0_2; apply: Rmult_lt_0_compat => //.
+  by apply/pow2_gt_0/Rgt_not_eq.
+have [M2 sEsltM2] := bounded_poly (m * l * (M1 ^ 2)) (m * l * g * (M1 + 1))
+  (sqrt (2 * B / ke)) hmslgt0.
+exists M2 => p Kp; apply: sEsltM2.
+have [_ Vps] := Kp; have /K0123ltM1 [_ [p1ltM1 [p2ltM1 _]]] := Kp.
+have : E p < sqrt (2 * B / ke).
+  apply: Rle_lt_trans (Rle_abs _) _.
+  rewrite -sqrt_Rsqr_abs Rsqr_pow2; apply: sqrt_lt_1_alt.
+  split; first exact: pow2_ge_0.
+  apply/(Rlt_div_r ((E p) ^ 2)) => //.
+  rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
+  rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
+  apply: Rle_lt_trans p0_valid; apply: Rle_trans Vps.
+  rewrite -[X in X <= _]Rplus_0_r [V _]Rplus_assoc; apply: Rplus_le_compat_l.
+  by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
+    apply: Rlt_le; apply: is_pos_div_2.
+apply: Rle_lt_trans; apply: Rplus_le_compat; last first.
+  apply: Rlt_le; rewrite !Ropp_mult_distr_r; apply: Rmult_lt_compat_l.
+    by do 2 ?[apply: Rmult_lt_0_compat => //].
+  rewrite Ropp_plus_distr; apply: Rplus_lt_compat_r.
+  by have /Rabs_def2 [] := p2ltM1.
+rewrite Rmult_plus_distr_l [1 / 2 * _ + _]Rplus_comm Rplus_assoc.
+have -> : 1 / 2 * (m * (l ^ 2) * (p[4] ^ 2)) = m * (l ^ 2) / 2 * (p[4] ^ 2).
+  by field.
+apply: Rplus_le_compat_l.
+rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat.
+  apply: Rmult_le_pos; first exact: Rdiv_le_0_compat Rle_0_1 Rlt_0_2.
+  apply: Rmult_le_pos (pow2_ge_0 _).
+  by apply: Rplus_le_le_0_compat; apply/Rlt_le.
+rewrite Rmult_assoc Ropp_mult_distr_r [X in _ <= X]Rmult_assoc
+  [X in _ <= X]Rmult_assoc.
+apply: Rmult_le_compat_l; first by apply: Rmult_le_pos; apply: Rlt_le.
+case: (Rle_lt_dec 0 (p[4])) => [p4ge0|p4lt0].
+  rewrite Ropp_mult_distr_l -Rmult_assoc Rabs_pos_eq => //.
+  apply: Rmult_le_compat_r p4ge0 _; rewrite /= Rmult_1_r.
+  case: (Rle_lt_dec 0 (p[1])) => [p1ge0|/Rlt_le p1le0].
+    rewrite Ropp_mult_distr_r.
+    have /Rabs_def2 [_ /Rlt_le p2geoM] := p2ltM1.
+    apply: Rle_trans (Rmult_le_compat_l _ _ _ p1ge0 p2geoM).
+    rewrite Rmult_comm [X in _ <= X]Rmult_comm.
+    apply: Rmult_le_compat_neg_l; last by have /Rabs_def2 [/Rlt_le] := p1ltM1.
+    rewrite -Ropp_0; apply/Ropp_le_contravar/Rlt_le.
+    by apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
+  rewrite Ropp_mult_distr_l.
+  have /Rabs_def2 [/Rlt_le p2leM _] := p2ltM1.
+  apply: Rle_trans (Rmult_le_compat_neg_l _ _ _ p1le0 p2leM).
+  apply: Rmult_le_compat_r; last by have /Rabs_def2 [_ /Rlt_le] := p1ltM1.
+  by apply: Rlt_le; apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
+rewrite (Rabs_left _ p4lt0) Ropp_mult_distr_r Ropp_involutive -Rmult_assoc.
+rewrite Rmult_comm [X in _ <= X]Rmult_comm /= Rmult_1_r.
+apply: Rmult_le_compat_neg_l; first exact: Rlt_le.
+case: (Rle_lt_dec 0 (p[1])) => [p1ge0|/Rlt_le p1le0].
+  have /Rabs_def2 [/Rlt_le p2leM1 _] := p2ltM1.
+  apply: Rle_trans (Rmult_le_compat_l _ _ _ p1ge0 p2leM1) _.
+  apply: Rmult_le_compat_r; last by have /Rabs_def2 [/Rlt_le] := p1ltM1.
+  by apply: Rlt_le; apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
+have /Rabs_def2 [_ /Rlt_le p2geoM1] := p2ltM1.
+apply: Rle_trans (Rmult_le_compat_neg_l _ _ _ p1le0 p2geoM1) _.
+rewrite -Ropp_mult_distr_r Ropp_mult_distr_l.
+apply: Rmult_le_compat_r.
+  by apply: Rlt_le; apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
+rewrite -[X in _ <= X]Ropp_involutive; apply: Ropp_le_contravar.
+by have /Rabs_def2 [_ /Rlt_le] := p1ltM1.
+Qed.
+
+Lemma Kco : compact K.
+Proof. exact: bounded_closed_compact is_bounded_K is_closed_K. Qed.
 
 Lemma Mp_ms_gt0 (p : U) : 0 < M + m * (p[3] ^ 2).
 Proof.
@@ -252,9 +436,9 @@ have [_ /(_ _ tge0) solp'] := sol_is_sol sol0 solP Kp.
 have : forall q, V' (sol p t) (scal q (Fpendulum (sol p t))) =
   scal q (V' (sol p t) (Fpendulum (sol p t))).
   move=> q; rewrite linear_scal //.
-  by have /filterdiff_V [] := @is_filter_lim_locally _ (sol p t).
+  by have [] := @filterdiff_V (locally (sol p t)) (sol p t).
 apply: filterdiff_ext_lin; apply: filterdiff_comp' solp' _.
-exact/filterdiff_V/is_filter_lim_locally.
+exact/filterdiff_V.
 Qed.
 
 Lemma defset_invar p : K p -> forall t, 0 <= t ->
@@ -291,16 +475,16 @@ have Vsolps_geB : B <= V (sol p s).
     have /se_Vsolp /Rabs_def2 [Vsolpr_s _] : ball s e r.
       apply: Rabs_def1; last first.
         have /Rminus_le_0 := sler; apply: Rlt_le_trans.
-        exact/Ropp_lt_gt_0_contravar/Rlt_gt/cond_pos.
+        exact/Ropp_lt_gt_0_contravar/Rlt_gt.
       have :  e / 2 <= e.
         apply/Rle_div_l; first exact/Rlt_gt/Rlt_0_2.
         rewrite -[X in X <= _]Rmult_1_r.
-        apply: Rmult_le_compat_l; [apply/Rlt_le/cond_pos|lra].
+        by apply: Rmult_le_compat_l; [apply/Rlt_le|apply/Rlt_le/Rlt_n_Sn].
       by apply/Rlt_le_trans/Rlt_minus_l; rewrite Rplus_comm.
     by apply: Rlt_not_le Vsolpr_ns; apply: Rplus_lt_reg_r Vsolpr_s.
   apply/Rlt_not_le.
   rewrite Rplus_comm; apply/Rlt_minus_l; rewrite Rminus_eq_0.
-  by apply/Rdiv_lt_0_compat; [apply: cond_pos|apply: Rlt_0_2].
+  by apply/Rdiv_lt_0_compat; [|apply: Rlt_0_2].
 have sgt0 : 0 < s.
   have /Rle_lt_or_eq_dec := sge0; case=> // seq0; exfalso.
   apply: Rlt_not_le Vsolps_geB; rewrite -seq0 sol0.
@@ -322,7 +506,7 @@ rewrite Rinv_r_simpl_l=> [VsolpsVpds|]; last exact/not_eq_sym/Rlt_not_eq.
 have : (V (sol p s) - V p) / s <= 0.
   rewrite /Rdiv VsolpsVpds -Ropp_mult_distr_l.
   apply/Rge_le/Ropp_0_le_ge_contravar; apply: Rmult_le_pos (pow2_ge_0 _).
-  exact/Rlt_le/cond_pos.
+  exact/Rlt_le.
 apply/Rlt_not_le/Rdiv_lt_0_compat => //.
 apply: Rlt_Rminus; apply: Rlt_le_trans Vsolps_geB.
 exact: Rle_lt_trans (proj2 Kp) p0_valid.

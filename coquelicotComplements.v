@@ -317,6 +317,7 @@ Notation "F --> G" := (filter_le [filter of F] [filter of G])
   (at level 70, format "F  -->  G") : classical_set_scope.
 
 Notation "'+oo'" := p_infty : classical_set_scope.
+Notation "'-oo'" := m_infty : classical_set_scope.
 
 Canonical eventually_filter X :=
   @CanonicalFilterSource X _ nat (fun f => f @ eventually).
@@ -476,6 +477,13 @@ Proof. by move=> Aop p ACbar_p /Aop /ACbar_p [? []]. Qed.
 
 End Closedness.
 
+Lemma continuous_closed_preimage (U V : UniformSpace) (f : U -> V) :
+  (forall p, continuous f p) -> forall A, is_closed A -> is_closed (f @^-1` A).
+Proof.
+by move=> fcont A Acl p clApreimp; apply: Acl => B /fcont /clApreimp [q []];
+  exists (f q).
+Qed.
+
 Section Openness.
 
 Variable (U : UniformSpace).
@@ -513,24 +521,12 @@ Qed.
 
 End Openness.
 
-Lemma between_epsilon x y z :
-  (forall eps : posreal, x - eps <= y <= z + eps) -> x <= y <= z.
-Proof.
-move=> xyz_eps.
-by split; apply: le_epsilon=> eps epsgt0; [apply/Rle_minus_l|];
-  have [] := xyz_eps (mkposreal _ epsgt0).
-Qed.
-
 Definition seg a b := Rle a `&` Rle^~ b.
 
 Lemma seg_closed a b : is_closed (seg a b).
 Proof.
-move=> x abbarx; apply: between_epsilon => eps.
-have /abbarx [y [[aley yleb]]] := locally_ball x eps.
-move/AbsRing_norm_compat2; rewrite Rmult_1_l abs_minus.
-move/Rlt_le/Rabs_le_between'=> [ymepslex xleypeps].
-split; first by apply: Rle_trans ymepslex; apply: Rplus_le_compat_r.
-by apply: Rle_trans; [apply: xleypeps|apply: Rplus_le_compat_r].
+apply: closed_is_closed; apply: closed_and; first exact: closed_ge.
+exact: closed_le.
 Qed.
 
 (* Code adapted from Guillaume Cano's PhD *)
@@ -1207,6 +1203,14 @@ have Ap : A p by apply: Acl => ? /clFp - /(_ _ FA).
 move=> /(fcont _ Ap) fp_C.
 suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).
 exact: filter_and FA _.
+Qed.
+
+Lemma between_epsilon x y z :
+  (forall eps : posreal, x - eps <= y <= z + eps) -> x <= y <= z.
+Proof.
+move=> xyz_eps.
+by split; apply: le_epsilon=> eps epsgt0; [apply/Rle_minus_l|];
+  have [] := xyz_eps (mkposreal _ epsgt0).
 Qed.
 
 Lemma Rhausdorff : hausdorff R_UniformSpace.
