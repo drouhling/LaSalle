@@ -1,4 +1,4 @@
-Require Import Reals.
+Require Import Reals Lra.
 From mathcomp Require Import ssreflect ssrfun eqtype ssrbool ssrnat bigop ssralg
   matrix fintype zmodp seq.
 Require Import lasalle tychonoff coquelicotComplements vect.
@@ -427,7 +427,7 @@ have : forall q, E' (sol p t) (scal q (Fpendulum (sol p t))) =
 by apply: filterdiff_ext_lin; apply: filterdiff_comp' solp' (filterdiff_E _).
 Qed.
 
-Lemma is_derive_Vsol p t :
+Lemma derive_Vsol p t :
   K p -> 0 <= t -> ((sol p t)[2] ^ 2) + ((sol p t)[3] ^ 2) = 1 ->
   V (sol p t) < B -> is_derive (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
 Proof.
@@ -492,7 +492,7 @@ have sgt0 : 0 < s.
 have Vsol_derive : forall t, Rmin 0 s < t < Rmax 0 s ->
   is_derive (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
   move=> t; rewrite Rmin_left => //; rewrite Rmax_right => // - [tgt0 tlts].
-  apply: is_derive_Vsol => //; first exact: Rlt_le.
+  apply: derive_Vsol => //; first exact: Rlt_le.
     by apply: circ_invar => //; apply: Rlt_le.
   apply: Rnot_le_lt => Vsolpt_ns; suff /Rlt_not_le : Rbar_le s t by apply.
   by apply: (proj1 s_glbA); split => //; apply: Rlt_le.
@@ -512,17 +512,259 @@ apply: Rlt_Rminus; apply: Rlt_le_trans Vsolps_geB.
 exact: Rle_lt_trans (proj2 Kp) p0_valid.
 Qed.
 
+Lemma is_derive_Vsol p t :
+  K p -> 0 <= t -> is_derive (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
+Proof.
+move=> Kp tge0; have [circpt Vpts] := defset_invar Kp tge0.
+exact: derive_Vsol.
+Qed.
+
 Lemma Kinvar : is_invariant sol K.
 Proof.
 move=> p Kp t tge0; have [_ Vp_s] := Kp; split; first exact: circ_invar.
 apply: Rle_trans Vp_s; rewrite -[X in _ <= V X]sol0.
 have Vderiv : forall s, Rbar_le 0 s -> Rbar_le s t ->
   is_derive (V \o (sol p)) s (- kd * ((sol p s)[1] ^ 2)).
-  case => // s sge0 slet; have [circ_solps Vsolps_s] := defset_invar Kp sge0.
-  exact: is_derive_Vsol.
+  by case => // s sge0 slet; apply: is_derive_Vsol.
 apply: (nincr_function_le Vderiv _ _ tge0); try exact: Rle_refl.
 move=> ? _ _; apply: Rmult_le_0_r; last exact: pow2_ge_0.
 by rewrite -Ropp_0; apply/Ropp_le_contravar/Rlt_le.
+Qed.
+
+Definition homoclinic_orbit : set (vect_UniformSpace R_UniformSpace 5) :=
+  [set p : U | p[0] = 0 /\ p[1] = 0 /\ E p = 0].
+
+Lemma limSKinvar : is_invariant sol (limS sol K).
+Proof.
+move=> p limSKp t tge0.
+exact: (@invariant_limS _ _ _ Kco _ sol0 solP sol_cont Kinvar).
+Qed.
+
+Lemma subset_limSK_K : limS sol K `<=` K.
+Proof.
+move=> p [q Kq solq_top].
+apply: compact_closed (@vect_hausdorff _ 5 Rhausdorff) Kco _ _.
+suff solqK : (sol q @ +oo) K.
+  by move=> A /solq_top - /(_ _ solqK) [r []]; exists r.
+by exists 0 => ? /Rlt_le; apply: Kinvar.
+Qed.
+
+Lemma Vsol_derive p t : K p -> 0 <= t ->
+  is_derive (V \o sol p) t ((V' (sol p t) \o Fpendulum) (sol p t)).
+Proof.
+move=> Kp tge0; have Ksolpt : K (sol p t) by apply: Kinvar.
+apply: filterdiff_ext_lin.
+  apply: filterdiff_comp'.
+    by have [_] := sol_is_sol sol0 solP Kp; apply.
+  by apply: filterdiff_V => ?; apply.
+move=> u; rewrite linear_scal //.
+by have [] := @filterdiff_V (locally (sol p t)) _ _ (fun _ a => a).
+Qed.
+
+Lemma Vsol'_eq0 p t :
+  limS sol K p -> 0 <= t -> (V' (sol p t) \o Fpendulum) (sol p t) = 0.
+Proof.
+move=> limSKp tge0; have limSKsolp : limS sol K (sol p t) by apply: limSKinvar.
+apply: (@stable_limS _ _ _ Kco _ sol0 solP sol_cont Kinvar V);
+  last exact: limSKsolp.
+  by move=> ??; apply: filterdiff_V.
+move=> r [circr Vrs]; rewrite /funcomp V'E //;
+  last exact: Rle_lt_trans p0_valid.
+rewrite -Ropp_mult_distr_l -Ropp_0; apply: Ropp_le_contravar.
+by apply: Rmult_le_pos; [apply: Rlt_le|apply: pow2_ge_0].
+Qed.
+
+Lemma sol1_eq0 p t : limS sol K p -> 0 <= t -> (sol p t)[1] = 0.
+Proof.
+move=> limSKp tge0; suff : - kd * ((sol p t)[1] ^ 2) = 0.
+  move=> /Rmult_integral; apply: or_ind.
+    by move=> / RMicromega.Ropp_0 kd0; exfalso; apply: (Rgt_not_eq kd 0) kd0.
+  by rewrite /= Rmult_1_r => /Rmult_integral; apply: or_ind.
+have /subset_limSK_K Kp := limSKp.
+rewrite -[LHS](is_derive_unique (V \o sol p) t); last first.
+  exact: is_derive_Vsol tge0.
+by rewrite -[RHS](Vsol'_eq0 limSKp tge0); apply/is_derive_unique/Vsol_derive.
+Qed.
+
+Lemma sol1'_eq0 p t : limS sol K p -> 0 <= t -> (Fpendulum (sol p t))[1] = 0.
+Proof.
+move=> limSKp tge0; have /subset_limSK_K Kp := limSKp.
+have [_ /(_ _ tge0)] := sol_is_sol sol0 solP Kp.
+move=> /(is_derive_component 1%:R) /is_derive_unique <-.
+by rewrite (derive_ext_ge0 tge0 (fun s sge0 => @sol1_eq0 _ _ limSKp sge0))
+  Derive_const.
+Qed.
+
+Lemma sol0_const p t : limS sol K p -> 0 <= t -> (sol p t)[0] = p[0].
+Proof.
+move=> limSKp tge0; rewrite -[p in RHS]sol0.
+apply/Logic.eq_sym; case: (Rle_lt_or_eq_dec _ _ tge0) => [|->] //.
+apply: (eq_is_derive (fun s => (sol p s)[0])) => s [sge0 _].
+rewrite -[zero](sol1_eq0 limSKp sge0).
+have /subset_limSK_K Kp := limSKp.
+have [_ /(_ _ sge0) /(is_derive_component (0%:R))] := sol_is_sol sol0 solP Kp.
+by rewrite !mxE.
+Qed.
+
+Lemma Esol_const p t : limS sol K p -> 0 <= t -> (E \o sol p) t = E p.
+Proof.
+move=> limSKp tge0; rewrite -[p in RHS]sol0.
+apply/Logic.eq_sym; case: (Rle_lt_or_eq_dec _ _ tge0) => [|->] //.
+apply: (eq_is_derive (E \o sol p)) => s [sge0 _].
+have -> : zero = (sol p s)[1] * (fctrl (sol p s)).
+  by rewrite sol1_eq0 ?Rmult_0_l.
+by apply: is_derive_Esol sge0; apply: subset_limSK_K.
+Qed.
+
+Lemma Efctrl_psol0_eq0 p t : limS sol K p -> 0 <= t ->
+  ke * (E (sol p t)) * (fctrl (sol p t)) + kx * (sol p t)[0] = 0.
+Proof.
+move=> limSKp tge0.
+have -> : 0 = - (kd * (sol p t)[1] + kv * (Fpendulum (sol p t))[1]).
+  by rewrite sol1_eq0 ?sol1'_eq0 ?Rmult_0_r ?Rplus_0_r ?Ropp_0.
+rewrite /Fpendulum !mxE /= /fctrl; field.
+split; last by rewrite -{2}[(sol p t)[3]]Rmult_1_r;
+  apply/not_eq_sym/Rlt_not_eq/Mp_ms_gt0.
+have [circsolt Vsolts] : K (sol p t).
+  by apply: Kinvar tge0; apply: subset_limSK_K.
+by apply: fctrl_wdef circsolt _; apply: Rle_lt_trans p0_valid.
+Qed.
+
+Lemma En0_fctrlsol_const p t :
+  limS sol K p -> E p <> 0 -> 0 <= t -> fctrl (sol p t) = fctrl p.
+Proof.
+move=> limSKp Epn0 tge0.
+have := Efctrl_psol0_eq0 limSKp tge0.
+rewrite -(Efctrl_psol0_eq0 limSKp (Rle_refl _)) sol0
+  [E (sol p t)](Esol_const limSKp tge0) (sol0_const limSKp tge0).
+move=> /Rplus_eq_reg_r /Rmult_eq_reg_l; apply.
+by apply: Rmult_integral_contrapositive_currified Epn0; apply/Rgt_not_eq.
+Qed.
+
+Lemma is_derive_nneg_unique (f : R -> R) t l1 l2 :
+  0 <= t -> filterdiff f (within (Rle 0) (locally t)) (scal^~ l1) ->
+  filterdiff f (within (Rle 0) (locally t)) (scal^~ l2) -> l1 = l2.
+Proof.
+move=> tge0 [_ f'tl1] [_ f'tl2].
+have tt : is_filter_lim (within (Rle 0) (locally t)) t.
+  by move=> A [e te_A]; exists e => ? /te_A.
+have /f'tl1 {f'tl1} f'tl1 := tt; have /f'tl2 {f'tl2} f'tl2 := tt.
+apply: Req_le_aux => e.
+have [e1 te1f'] := f'tl1 (mkposreal _ (is_pos_div_2 e)).
+have [e2 te2f'] := f'tl2 (mkposreal _ (is_pos_div_2 e)).
+set s := t + (Rmin e1 e2) / 2.
+have hmine12_ge0 : 0 <= (Rmin e1 e2) / 2.
+  apply/Rle_div_r; first exact: Rlt_0_2.
+  by rewrite Rmult_0_l; apply/Rlt_le/Rmin_pos.
+have sge0 : 0 <= s by apply: Rplus_le_le_0_compat tge0 _.
+have smt_val : s - t = (Rmin e1 e2) / 2 by rewrite /s; ring.
+have : ball t e1 s.
+  apply: Rabs_def1; rewrite [minus _ _]smt_val.
+    apply/Rlt_div_l; first exact: Rlt_0_2.
+    by apply: Rle_lt_trans (Rmin_l _ _) _; have := cond_pos e1; lra.
+  by apply: Rlt_le_trans hmine12_ge0; have := cond_pos e1; lra.
+move=> /te1f' /(_ sge0) /= hl1.
+have : ball t e2 s.
+  apply: Rabs_def1; rewrite [minus _ _]smt_val.
+    apply/Rlt_div_l; first exact: Rlt_0_2.
+    by apply: Rle_lt_trans (Rmin_r _ _) _; have := cond_pos e2; lra.
+  by apply: Rlt_le_trans hmine12_ge0; have := cond_pos e2; lra.
+move=> /te2f' /(_ sge0) /= hl2.
+have -> : l1 - l2 =
+  ((((f s) - (f t)) / (s - t)) - l2) - ((((f s) - (f t)) / (s - t)) - l1).
+  by ring.
+have smt_gt0 : 0 < norm (s - t).
+  rewrite smt_val; apply: Rabs_pos_lt.
+  apply/Rgt_not_eq/Rlt_div_r; first exact: Rlt_0_2.
+  by rewrite Rmult_0_l; apply: Rmin_pos.
+apply: Rle_trans (Rabs_triang _ _) _.
+rewrite [_ e]double_var; apply: Rplus_le_compat.
+  move: hl2 => /(Rle_div_l _ _ _ smt_gt0).
+  rewrite -Rabs_div; last first.
+    by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
+  rewrite [(minus _ _) / _]RIneq.Rdiv_minus_distr
+    [(scal _ _) / _]Rinv_r_simpl_m => //.
+  by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
+move: hl1 => /(Rle_div_l _ _ _ smt_gt0).
+rewrite Rabs_Ropp -Rabs_div; last first.
+  by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
+rewrite [(minus _ _) / _]RIneq.Rdiv_minus_distr
+  [(scal _ _) / _]Rinv_r_simpl_m => //.
+by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
+Qed.
+
+Lemma En0_fctrlsol0 p t :
+  limS sol K p -> E p <> 0 -> 0 <= t -> fctrl (sol p t) = 0.
+Proof.
+move=> limSKp Epn0 tge0.
+have divfm_val s :
+  0 <= s -> (sol p s)[3] * (g * (sol p s)[2] - l * ((sol p s)[4] ^ 2)) =
+  (fctrl (sol p s)) / m.
+  move=> sge0; apply/Logic.eq_sym/RMicromega.Rinv_elim.
+    exact/Rinv_neq_0_compat/Rgt_not_eq.
+  rewrite Rinv_involutive; last exact/Rgt_not_eq.
+  have := sol1'_eq0 limSKp sge0; rewrite !mxE /=.
+  have IMp_ms_n0 : / (M + m * ((sol p s)[3] ^ 2)) <> 0.
+    exact/Rinv_neq_0_compat/Rgt_not_eq/Mp_ms_gt0.
+  move=> /RMicromega.Rinv_elim - /(_ IMp_ms_n0).
+  rewrite Rmult_0_l => fctrl_val; have {fctrl_val} := Logic.eq_sym fctrl_val.
+  by move=> /Rplus_opp_r_uniq ->; ring.
+suff [sol3eq0 sol4eq0] : (sol p t)[3] = 0 /\ (sol p t)[4] = 0.
+  have /divfm_val := tge0; rewrite sol3eq0 sol4eq0 Rmult_0_l => f0.
+  have /RMicromega.Rinv_elim := Logic.eq_sym f0.
+  by rewrite Rmult_0_l => -> //; apply/Rinv_neq_0_compat/Rgt_not_eq.
+have [C1 [C2 sol32_val]] : exists C1 C2, forall s, 0 <= s ->
+  (sol p s)[3] * (3 * g * (sol p s)[2] + C1) = C2.
+  exists (- (2 * g + ((2 * (E p))/ (m * l)))); exists ((fctrl p) / m) => s sge0.
+  rewrite -(Esol_const limSKp sge0) /E /= (sol1_eq0 limSKp sge0)
+    -(En0_fctrlsol_const limSKp Epn0 sge0) -(divfm_val _ sge0).
+  by field; split; apply: Rgt_not_eq.
+have sol423_val s : 0 <= s ->
+  (sol p s)[4] * (3 * g * (((sol p s)[2] ^ 2) - ((sol p s)[3] ^ 2)) +
+    C1 * (sol p s)[2]) = 0.
+  move=> sge0.
+  apply: (@is_derive_nneg_unique (fun _ => C2) s) => //; last first.
+    apply: filterdiff_ext_lin (filterdiff_const _) _.
+    by move=> ?; rewrite scal_zero_r.
+  have withinRplocs_proper : ProperFilter (within (Rle 0) (locally s)).
+    by apply: within_locally_proper => ? /locally_singleton; exists s.
+  have lims : is_filter_lim (within (Rle 0) (locally s)) s.
+    by move=> A [e se_A]; exists e => ? /se_A.
+  apply: (filterdiff_ext_loc (fun s =>
+    (sol p s)[3] * (3 * g * (sol p s)[2] + C1))).
+  - by exists (mkposreal _ Rlt_0_1) => ??; apply: sol32_val.
+  - move=> r reqs; apply: sol32_val.
+    suff -> : r = s by [].
+    have withinRplocs_proper' : ProperFilter' (within (Rle 0) (locally s)).
+      exact: Proper_StrongProper.
+    exact: is_filter_lim_unique reqs _.
+  - apply: filterdiff_locally lims _.
+    have -> : (sol p s)[4] * (3 * g * (((sol p s)[2] ^ 2) -
+      ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) =
+      (Fpendulum (sol p s))[3] * (3 * g * (sol p s)[2] + C1) +
+      (sol p s)[3] * (3 * g * (Fpendulum (sol p s))[2] + 0).
+      by rewrite /Fpendulum !mxE /=; ring.
+    have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP (subset_limSK_K limSKp).
+    apply: is_derive_mult; first exact: is_derive_component.
+    apply: is_derive_plus; last exact: is_derive_const.
+    exact/is_derive_scal/is_derive_component.
+Admitted.
+
+Lemma subset_limSK_homoclinic_orbit : limS sol K `<=` homoclinic_orbit.
+Proof.
+move=> p limSKp.
+case: (Req_dec (E p) 0) => [Ep0|Epn0].
+  have := sol1_eq0 limSKp (Rle_refl _); rewrite sol0 => p10.
+  have := Efctrl_psol0_eq0 limSKp (Rle_refl _).
+  rewrite sol0 Ep0 Rmult_0_r Rmult_0_l Rplus_0_l => /Rmult_integral.
+  by apply: or_ind => // kx0; exfalso; apply: Rgt_not_eq kx0.
+exfalso.
+Admitted.
+
+Lemma cvg_to_homoclinic_orbit p : K p -> sol p @ +oo --> homoclinic_orbit.
+Proof.
+move=> Kp; apply: cvg_to_superset subset_limSK_homoclinic_orbit _.
+exact: cvg_to_limS Kco Kinvar _ Kp.
 Qed.
 
 End System.
