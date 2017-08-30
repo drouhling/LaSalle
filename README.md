@@ -20,8 +20,8 @@ It is organised as follows:
 
 - tychonoff.v: this file contains a proof of Tychonoff's theorem. (WIP)
 
-- pendulum.v : in this file we will apply LaSalles invariance principle to an
-  inverted pendulum. (WIP)
+- pendulum.v : in this file we will apply LaSalle's invariance principle to an
+  inverted pendulum.
 
 # Authors
 

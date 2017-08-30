@@ -725,6 +725,26 @@ rewrite [(minus _ _) / _]RIneq.Rdiv_minus_distr
 by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
 Qed.
 
+Lemma derive_nneg_eq (f g : R -> R) t l1 l2 :
+  (forall t, 0 <= t -> f t = g t) -> 0 <= t ->
+  is_derive f t l1 -> is_derive g t l2 -> l1 = l2.
+Proof.
+move=> feqg tge0 f'l1 g'l2.
+have withinRploct_proper : ProperFilter (within (Rle 0) (locally t)).
+  by apply: within_locally_proper => ? /locally_singleton; exists t.
+have limt : is_filter_lim (within (Rle 0) (locally t)) t.
+  by move=> A [e se_A]; exists e => ? /se_A.
+apply: (@is_derive_nneg_unique f t _ _ tge0).
+  exact: filterdiff_locally f'l1.
+apply: (filterdiff_ext_loc g).
+- by exists (mkposreal _ Rlt_0_1) => ???; rewrite feqg.
+- move=> s seqt; rewrite feqg //; suff -> : s = t by [].
+  have withinRploct_proper' : ProperFilter' (within (Rle 0) (locally t)).
+    exact: Proper_StrongProper.
+  exact: is_filter_lim_unique seqt _.
+- exact: filterdiff_locally g'l2.
+Qed.
+
 Lemma cont_is_lim (f : R -> R) x : continuous f x <-> is_lim f x (f x).
 Proof.
 apply: iff_trans (continuity_pt_filterlim' _ _); apply: iff_sym.
@@ -868,10 +888,11 @@ have -> : - ((b ^ 2) / (4 * a)) = (b ^ 2) / (- 4 * a) by field.
 by apply/Rlt_Rminus/Rlt_div_l; [|move: dltlt0; rewrite /dlt]; lra.
 Qed.
 
-Lemma En0_sol2_const p t :
-  limS sol K p -> E p <> 0 -> 0 <= t -> (sol p t)[2] = p[2].
+Lemma En0_sol2_const p :
+  limS sol K p -> E p <> 0 -> forall t, 0 <= t -> (sol p t)[2] = p[2].
 Proof.
-move=> limSKp Epn0 tge0.
+move=> limSKp Epn0 t tge0.
+have Kp : K p by apply: subset_limSK_K.
 set C1 := - (2 * g + ((2 * (E p))/ (m * l))); set C2 := (fctrl p) / m.
 have sol32_val : forall s, 0 <= s ->
   (sol p s)[3] * (3 * g * (sol p s)[2] + C1) = C2.
@@ -882,69 +903,39 @@ have sol32_val : forall s, 0 <= s ->
 have sol423_val s : 0 <= s ->
   (sol p s)[4] * (3 * g * (((sol p s)[2] ^ 2) - ((sol p s)[3] ^ 2)) +
     C1 * (sol p s)[2]) = 0.
-  move=> sge0.
-  apply: (@is_derive_nneg_unique (fun _ => C2) s) => //; last first.
-    apply: filterdiff_ext_lin (filterdiff_const _) _.
-    by move=> ?; rewrite scal_zero_r.
-  have withinRplocs_proper : ProperFilter (within (Rle 0) (locally s)).
-    by apply: within_locally_proper => ? /locally_singleton; exists s.
-  have lims : is_filter_lim (within (Rle 0) (locally s)) s.
-    by move=> A [e se_A]; exists e => ? /se_A.
-  apply: (filterdiff_ext_loc (fun s =>
-    (sol p s)[3] * (3 * g * (sol p s)[2] + C1))).
-  - by exists (mkposreal _ Rlt_0_1) => ??; apply: sol32_val.
-  - move=> r reqs; apply: sol32_val.
-    suff -> : r = s by [].
-    have withinRplocs_proper' : ProperFilter' (within (Rle 0) (locally s)).
-      exact: Proper_StrongProper.
-    exact: is_filter_lim_unique reqs _.
-  - apply: filterdiff_locally lims _.
-    have -> : (sol p s)[4] * (3 * g * (((sol p s)[2] ^ 2) -
-      ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) =
-      (Fpendulum (sol p s))[3] * (3 * g * (sol p s)[2] + C1) +
-      (sol p s)[3] * (3 * g * (Fpendulum (sol p s))[2] + 0).
-      by rewrite /Fpendulum !mxE /=; ring.
-    have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP (subset_limSK_K limSKp).
-    apply: is_derive_mult; first exact: is_derive_component.
-    apply: is_derive_plus; last exact: is_derive_const.
-    exact/is_derive_scal/is_derive_component.
+  move=> sge0; apply: (derive_nneg_eq sol32_val sge0); last first.
+    exact: is_derive_const.
+  have -> : (sol p s)[4] * (3 * g * (((sol p s)[2] ^ 2) -
+    ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) =
+    (Fpendulum (sol p s))[3] * (3 * g * (sol p s)[2] + C1) +
+    (sol p s)[3] * (3 * g * (Fpendulum (sol p s))[2] + 0).
+    by rewrite /Fpendulum !mxE /=; ring.
+  have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp.
+  apply: is_derive_mult; first exact: is_derive_component.
+  apply: is_derive_plus; last exact: is_derive_const.
+  exact/is_derive_scal/is_derive_component.
 have sol432_val' s : 0 <= s ->
   (sol p s)[3] * ((g / l) * (3 * g * (((sol p s)[2] ^ 2) -
     ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) -
     ((sol p s)[4] ^ 2) * (12 * g * (sol p s)[2] + C1)) = 0.
-  move=> sge0.
-  apply: (@is_derive_nneg_unique (fun _ => 0) s) => //; last first.
-    apply: filterdiff_ext_lin (filterdiff_const _) _.
-    by move=> ?; rewrite scal_zero_r.
-  have withinRplocs_proper : ProperFilter (within (Rle 0) (locally s)).
-    by apply: within_locally_proper => ? /locally_singleton; exists s.
-  have lims : is_filter_lim (within (Rle 0) (locally s)) s.
-    by move=> A [e se_A]; exists e => ? /se_A.
-  apply: (filterdiff_ext_loc (fun s => (sol p s)[4] *
-    (3 * g * (((sol p s)[2] ^ 2) - ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]))).
-  - exists (mkposreal _ Rlt_0_1) => ??; apply: sol423_val.
-  - move=> r reqs; apply: sol423_val.
-    suff -> : r = s by [].
-    have withinRplocs_proper' : ProperFilter' (within (Rle 0) (locally s)).
-      exact: Proper_StrongProper.
-    exact: is_filter_lim_unique reqs _.
-  - apply: filterdiff_locally lims _.
-    have -> : (sol p s)[3] * ((g / l) * (3 * g * (((sol p s)[2] ^ 2) -
-      ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) -
-      ((sol p s)[4] ^ 2) * (12 * g * (sol p s)[2] + C1)) =
-      (Fpendulum (sol p s))[4] * (3 * g * (((sol p s)[2] ^ 2) -
-      ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) +
-      (sol p s)[4] * (3 * g *
-      (2 * (Fpendulum (sol p s))[2] * ((sol p s)[2] ^ 2.-1) -
-      2 * (Fpendulum (sol p s))[3] * ((sol p s)[3] ^ 2.-1)) +
-      C1 * (Fpendulum (sol p s))[2]).
-      by rewrite Fpendulum4E // !mxE /=; field; apply: Rgt_not_eq.
-    have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP (subset_limSK_K limSKp).
-    apply: is_derive_mult; first exact: is_derive_component.
-    apply: is_derive_plus; last exact/is_derive_scal/is_derive_component.
-    apply/is_derive_scal/is_derive_plus.
-      exact/is_derive_pow/is_derive_component.
-    exact/is_derive_opp/is_derive_pow/is_derive_component.
+  move=> sge0; apply: (derive_nneg_eq sol423_val sge0); last first.
+    exact: is_derive_const.
+  have -> : (sol p s)[3] * ((g / l) * (3 * g * (((sol p s)[2] ^ 2) -
+    ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) -
+    ((sol p s)[4] ^ 2) * (12 * g * (sol p s)[2] + C1)) =
+    (Fpendulum (sol p s))[4] * (3 * g * (((sol p s)[2] ^ 2) -
+    ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) +
+    (sol p s)[4] * (3 * g *
+    (2 * (Fpendulum (sol p s))[2] * ((sol p s)[2] ^ 2.-1) -
+    2 * (Fpendulum (sol p s))[3] * ((sol p s)[3] ^ 2.-1)) +
+    C1 * (Fpendulum (sol p s))[2]).
+    by rewrite Fpendulum4E // !mxE /=; field; apply: Rgt_not_eq.
+  have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp.
+  apply: is_derive_mult; first exact: is_derive_component.
+  apply: is_derive_plus; last exact/is_derive_scal/is_derive_component.
+  apply/is_derive_scal/is_derive_plus.
+    exact/is_derive_pow/is_derive_component.
+  exact/is_derive_opp/is_derive_pow/is_derive_component.
 set x1 := (- C1 + sqrt ((C1 ^ 2) - 4 * (6 * g) * (- 3 * g))) / (2 * (6 * g)).
 set x2 := (- C1 - sqrt ((C1 ^ 2) - 4 * (6 * g) * (- 3 * g))) / (2 * (6 * g)).
 set f := fun i : 'I_4 => if i == ord0 then - 1 else
@@ -954,7 +945,6 @@ rewrite -[p in RHS]sol0.
 apply: (@cont_finimage_const (fun s => (sol p s)[2]) _ f) tge0.
   move=> s sge0; apply: filterdiff_continuous.
   exists (scal^~ ((Fpendulum (sol p s))[2])); apply: is_derive_component.
-  have Kp : K p by apply: subset_limSK_K.
   by have [_ /(_ _ sge0)] := sol_is_sol sol0 solP Kp.
 move=> s sge0.
 have circsol : ((sol p s)[2] ^ 2) + ((sol p s)[3] ^ 2) = 1.
@@ -987,10 +977,10 @@ move=> /Rmult_integral gdivl0; exfalso; move: gdivl0; apply: or_ind.
 exact/Rinv_neq_0_compat/Rgt_not_eq.
 Qed.
 
-Lemma En0_sol3_const p t :
-  limS sol K p -> E p <> 0 -> 0 <= t -> (sol p t)[3] = p[3].
+Lemma En0_sol3_const p :
+  limS sol K p -> E p <> 0 -> forall t, 0 <= t -> (sol p t)[3] = p[3].
 Proof.
-move=> limSKp Epn0 tge0.
+move=> limSKp Epn0 t tge0.
 have circsol s : 0 <= s -> (p[2] ^ 2) + ((sol p s)[3] ^ 2) = 1.
   move=> sge0; rewrite -(En0_sol2_const limSKp Epn0 sge0).
   suff [] : K (sol p s) by [].
@@ -1011,44 +1001,26 @@ have /Rsqr_eq : Rsqr ((sol p s)[3]) = Rsqr (sqrt (1 - (p[2] ^ 2))).
 by apply: or_ind => [sols3eg0|sols3eg1]; [exists ord0|exists 1%:R].
 Qed.
 
-Lemma En0_sol4_eq0 p t :
-  limS sol K p -> E p <> 0 -> 0 <= t -> (sol p t)[4] = 0.
+Lemma En0_sol4_eq0 p :
+  limS sol K p -> E p <> 0 -> forall t, 0 <= t -> (sol p t)[4] = 0.
 Proof.
-move=> limSKp Epn0 tge0.
+move=> limSKp Epn0 t tge0.
 have Kp : K p by apply: subset_limSK_K.
 have [_ /(_ _ tge0) sol't] := sol_is_sol sol0 solP Kp.
-have withinRploc_proper : ProperFilter (within (Rle 0) (locally t)).
-  exact/within_locally_proper/subset_closure.
-have withinRploc_proper' : ProperFilter' (within (Rle 0) (locally t)).
-  exact/Proper_StrongProper.
 have /Rmult_integral : (sol p t)[3] * (sol p t)[4] = 0.
   apply: RMicromega.Ropp_0; rewrite Ropp_mult_distr_l.
-  apply: (@is_derive_nneg_unique (fun s => (sol p s)[2]) t) => //.
-    apply: (filterdiff_locally _ t).
-      by move=> A [e e_A]; exists e => ? /e_A.
-    have -> : - (sol p t)[3] * (sol p t)[4] = (Fpendulum (sol p t))[2].
-      by rewrite mxE.
-    exact: is_derive_component sol't.
-  have -> : scal^~ 0 = fun _ => 0 by apply/funext => ?; rewrite scal_zero_r.
-  apply: filterdiff_ext_loc (filterdiff_const (p[2])).
-    by exists (mkposreal _ Rlt_0_1) => ???; rewrite En0_sol2_const.
-  move=> s slim; rewrite En0_sol2_const //.
-  suff -> : s = t by [].
-  by apply/is_filter_lim_unique => // A [e e_A]; exists e => ? /e_A.
+  apply: (derive_nneg_eq (En0_sol2_const limSKp Epn0) tge0); last first.
+    exact: is_derive_const.
+  have -> : - (sol p t)[3] * (sol p t)[4] = (Fpendulum (sol p t))[2].
+    by rewrite mxE.
+  exact: is_derive_component.
 apply: or_ind => // sol3eq0.
 have /Rmult_integral : (sol p t)[2] * (sol p t)[4] = 0.
-  apply: (@is_derive_nneg_unique (fun s => (sol p s)[3]) t) => //.
-    apply: (filterdiff_locally _ t).
-      by move=> A [e e_A]; exists e => ? /e_A.
-    have -> : (sol p t)[2] * (sol p t)[4] = (Fpendulum (sol p t))[3].
-      by rewrite mxE.
-    exact: is_derive_component sol't.
-  have -> : scal^~ 0 = fun _ => 0 by apply/funext => ?; rewrite scal_zero_r.
-  apply: filterdiff_ext_loc (filterdiff_const (p[3])).
-    by exists (mkposreal _ Rlt_0_1) => ???; rewrite En0_sol3_const.
-  move=> s slim; rewrite En0_sol3_const //.
-  suff -> : s = t by [].
-  by apply/is_filter_lim_unique => // A [e e_A]; exists e => ? /e_A.
+  apply: (derive_nneg_eq (En0_sol3_const limSKp Epn0) tge0); last first.
+    exact: is_derive_const.
+  have -> : (sol p t)[2] * (sol p t)[4] = (Fpendulum (sol p t))[3].
+    by rewrite mxE.
+  exact: is_derive_component.
 apply: or_ind => // sol2eq0; exfalso.
 have [] : K (sol p t) by apply/Kinvar.
 rewrite sol3eq0 sol2eq0 ![_ ^ 2]Rmult_0_l Rplus_0_l => eq01 _.
@@ -1059,30 +1031,16 @@ Lemma En0_sol3_eq0 p t :
   limS sol K p -> E p <> 0 -> 0 <= t -> (sol p t)[3] = 0.
 Proof.
 move=> limSKp Epn0 tge0; rewrite En0_sol3_const => //.
-apply: or_ind (Req_dec (p[3]) 0) => // p3n0; exfalso.
-have sol4'0 s : 0 <= s -> (Fpendulum (sol p s))[4] = 0.
-  move=> sge0.
-  have withinRploc0_proper : ProperFilter (within (Rle 0) (locally s)).
-    exact/within_locally_proper/subset_closure.
-  apply: (@is_derive_nneg_unique (fun t => (sol p t)[4]) s) => //.
-    apply: (filterdiff_locally _ s).
-      by move=> A [e e_A]; exists e => ? /e_A.
-    have Kp : K p by apply: subset_limSK_K.
-    have [_ /(_ _ sge0)] := sol_is_sol sol0 solP Kp.
-    exact: is_derive_component.
-  have -> : scal^~ 0 = fun _ => 0 by apply/funext => ?; rewrite scal_zero_r.
-  apply: filterdiff_ext_loc (filterdiff_const 0).
-    by exists (mkposreal _ Rlt_0_1) => ???; rewrite En0_sol4_eq0.
-  move=> r rlim; rewrite En0_sol4_eq0 //.
-  have withinRploc0_proper' : ProperFilter' (within (Rle 0) (locally s)).
-    exact/Proper_StrongProper.
-  suff -> : r = s by [].
-  by apply/is_filter_lim_unique => // A [e e_A]; exists e => ? /e_A.
-apply: p3n0; have /sol4'0 := Rle_refl 0; rewrite Fpendulum4E //; last first.
-  exact: Rle_refl.
+apply: or_ind (Req_dec (p[3]) 0) => // p3n0; exfalso; apply: p3n0.
+have : (Fpendulum (sol p 0))[4] = 0.
+  apply: (derive_nneg_eq (En0_sol4_eq0 limSKp Epn0) (Rle_refl 0)); last first.
+    exact: is_derive_const.
+  have Kp : K p by apply: subset_limSK_K.
+  have [_ /(_ _ (Rle_refl 0))] := sol_is_sol sol0 solP Kp.
+  exact: is_derive_component.
+rewrite Fpendulum4E //; last exact: Rle_refl.
 rewrite sol0 => /Rmult_integral; apply: or_ind => // g0; exfalso.
-apply: Rmult_integral_contrapositive g0; split.
-  exact: Rgt_not_eq.
+apply: Rmult_integral_contrapositive g0; split; first exact: Rgt_not_eq.
 exact/Rinv_neq_0_compat/Rgt_not_eq.
 Qed.
 
