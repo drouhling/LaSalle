@@ -4,7 +4,8 @@ This repository contains a formal proof in Coq of LaSalle's invariance
 principle.
 
 It requires Coq v8.6, the Mathematical Components library v1.6.1 and the
-Coquelicot library v3.0.0.
+Coquelicot library v3.0.0. It also depends on Daniel Schepler's proof of [Zorn's
+lemma](https://github.com/coq-contribs/zorns-lemma).
 
 It is organised as follows:
 
@@ -18,7 +19,7 @@ It is organised as follows:
 - vect.v: in this file we prove that Mathematical Components' row vectors
   inherit Coquelicot's topological structures.
 
-- tychonoff.v: this file contains a proof of Tychonoff's theorem. (WIP)
+- tychonoff.v: this file contains a proof of Tychonoff's theorem.
 
 - pendulum.v : in this file we will apply LaSalle's invariance principle to an
   inverted pendulum.

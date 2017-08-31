@@ -3,6 +3,7 @@ From Coquelicot Require Import Hierarchy.
 From mathcomp Require Import ssreflect ssrnat ssrbool ssrfun eqtype bigop ssralg
   matrix fintype zmodp.
 Require Import coquelicotComplements vect.
+From ZornsLemma Require Import ZornsLemma.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -328,7 +329,43 @@ Class UltraFilter T (F : set (set T)) := {
 Lemma ultraFilterLemma T (F : set (set T)) :
   ProperFilter F -> exists G, UltraFilter G /\ F `<=` G.
 Proof.
-Admitted.
+move=> Fproper.
+set filter_preordset := ({G : set (set T) & ProperFilter G /\ F `<=` G}).
+set preorder := fun G1 G2 : filter_preordset => projT1 G1 `<=` projT1 G2.
+suff [G Gmax] : exists G : filter_preordset, premaximal preorder G.
+  have [Gproper sFG] := projT2 G.
+  exists (projT1 G); split=> //; split=> // H Hproper sGH.
+  have sFH : F `<=` H by apply: subset_trans sGH.
+  suff sHG : preorder (existT _ H (conj Hproper sFH)) G.
+    by apply/funext => ?; apply/propext; split=> [/sHG|/sGH].
+  exact: Gmax.
+apply: ZornsLemmaForPreorders.
+  by constructor=> [?|G H I sGH sHI ? /sGH /sHI].
+move=> S Schain.
+apply: or_ind (classic (Inhabited S)) => [[G SG]|S0]; last first.
+  have sFF : F `<=` F by [].
+  exists (existT _ F (conj Fproper sFF)).
+  by move=> G SG; exfalso; apply: S0; apply: Inhabited_intro SG.
+have [Gproper sFG] := projT2 G.
+have USproper : ProperFilter (\bigcup_(H in S) projT1 H).
+  constructor.
+    move=> A [H SH HA]; have [Hproper _] := projT2 H.
+    exact: filter_ex HA.
+  constructor.
+  - by exists G => //; apply: filter_true.
+  - move=> A B [H1 SH1 H1A] [H2 SH2 H2B].
+    apply: or_ind (Schain _ _ SH1 SH2) => [sH12|sH21].
+      have /sH12 H2A := H1A; have [H2proper _] := projT2 H2.
+      by exists H2 => //; apply: filter_and.
+    have /sH21 H1B := H2B; have [H1proper _] := projT2 H1.
+    by exists H1 => //; apply: filter_and.
+  - move=> A B sAB [H SH HA]; have [Hproper _] := projT2 H.
+    by exists H => //; apply: filter_imp HA.
+have sFUS : F `<=` \bigcup_(H in S) projT1 H.
+  by move=> A FA; exists G => //; apply: sFG.
+exists (existT _ (\bigcup_(H in S) projT1 H) (conj USproper sFUS)).
+by move=> H SH A HA; exists H.
+Qed.
 
 Lemma subset_fin_inter_ultra T Ti (f : family T Ti) :
   finite_inter f -> exists F, UltraFilter F /\ forall i, ind f i -> F (f i).
