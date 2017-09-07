@@ -333,17 +333,123 @@ Definition normedModule_of (T : AbsRing) (_ : phantom Type (AbsRing.sort T)) :=
 Notation "{ 'normedModule' T }" := (@normedModule_of _ (Phantom Type T))
   (at level 0, format "{ 'normedModule'  T }") : type_scope.
 
-(* frequent composition *)
-Lemma is_derive_shift K (V : NormedModule K) (f : K -> V) x l s :
-  is_derive f (plus x s) l -> is_derive (fun y => f (plus y s)) x l.
+Section Auto_diff.
+
+Variable (K : AbsRing).
+
+Class diff (U V : NormedModule K) (f : U -> V) (F : set (set U))
+  (f' : U -> V) := diff_prf : filterdiff f F f'.
+
+Class deriv (V : NormedModule K) (f : K -> V) x l :=
+  deriv_prf : is_derive f x l.
+
+Variable  (U V : NormedModule K) (F : set (set U)).
+
+Global Instance diff_const (p : V) :
+  Filter F -> diff (fun _ => p) F (fun _ => zero).
+Proof. by move=> ?; apply: filterdiff_const. Qed.
+
+Global Instance deriv_const (p : V) x : deriv (fun _ => p) x zero.
+Proof. exact: is_derive_const. Qed.
+
+Global Instance diff_id : diff id F id.
+Proof. exact: filterdiff_id. Qed.
+
+Global Instance deriv_id x : deriv id x one.
+Proof. exact: is_derive_id. Qed.
+
+Global Instance diff_plus (f g lf lg : U -> V) :
+  Filter F -> diff f F lf -> diff g F lg ->
+  diff (fun p => plus (f p) (g p)) F (fun p => plus (lf p) (lg p)).
+Proof. by move=> ?; apply: filterdiff_plus_fct. Qed.
+
+Global Instance deriv_plus (f g : K -> V) x df dg :
+  deriv f x df -> deriv g x dg ->
+  deriv (fun y => plus (f y) (g y)) x (plus df dg).
+Proof. exact: is_derive_plus. Qed.
+
+Global Instance diff_opp (f lf : U -> V) :
+  Filter F -> diff f F lf -> diff (fun p => opp (f p)) F (fun p => opp (lf p)).
+Proof. by move=> ?; apply: filterdiff_opp_fct. Qed.
+
+Global Instance deriv_opp (f : K -> V) x df :
+  deriv f x df -> deriv (fun y => opp (f y)) x (opp df).
+Proof. exact: is_derive_opp. Qed.
+
+Global Instance diff_minus (f g lf lg : U -> V) :
+  Filter F -> diff f F lf -> diff g F lg ->
+  diff (fun p => minus (f p) (g p)) F (fun p => minus (lf p) (lg p)).
+Proof. by move=> ?; apply: filterdiff_minus_fct. Qed.
+
+Global Instance deriv_minus (f g : K -> V) x df dg :
+  deriv f x df -> deriv g x dg ->
+  deriv (fun y => minus (f y) (g y)) x (minus df dg).
+Proof. exact: is_derive_minus. Qed.
+
+Global Instance deriv_diff_comp (f : K -> U) (g : U -> V) x df dg :
+  deriv f x df -> diff g (locally (f x)) dg -> deriv (g \o f) x (dg df) | 999.
 Proof.
-move=> f'_plus.
-rewrite -[l]scal_one.
-apply: is_derive_comp=> //.
-rewrite -[one]plus_zero_r.
-apply: is_derive_plus.
-  exact: is_derive_id.
-exact: is_derive_const.
+move=> deriv_f diff_g.
+have : forall y, dg (scal y df) = scal y (dg df).
+  by move=> ?; rewrite linear_scal => //; have [] := diff_g.
+apply: filterdiff_ext_lin; apply: (filterdiff_comp f g); first exact: deriv_f.
+(* it is not inferred… why? *)
+have fx_proper : ProperFilter (filtermap f (locally x)).
+  exact: filtermap_proper_filter.
+apply: filterdiff_locally diff_g.
+by apply: ex_derive_continuous; exists df.
+Qed.
+
+Global Instance deriv_comp (f : K -> K) (g : K -> V) x df dg :
+  deriv f x df -> deriv g (f x) dg -> deriv (g \o f) x (scal df dg) | 999.
+Proof. by move=> ??; apply: is_derive_comp. Qed.
+
+Lemma diff_eq (f f' g : U -> V) :
+  diff f F f' -> f' = g -> diff f F g.
+Proof. by move=> ? <-. Qed.
+
+Lemma deriv_eq (f : K -> V) x df df' :
+  deriv f x df -> df = df' -> deriv f x df'.
+Proof. by move=> ? <-. Qed.
+
+Lemma ex_diff (f f' : U -> V) :
+  diff f F f' -> ex_filterdiff f F.
+Proof. by exists f'. Qed.
+
+Lemma ex_deriv (f : K -> V) x df :
+  deriv f x df -> ex_derive f x.
+Proof. by exists df. Qed.
+
+End Auto_diff.
+
+Lemma deriv_unique (f : R -> R) x df df' :
+  deriv f x df -> deriv f x df' -> df = df'.
+Proof. by move=> /is_derive_unique <- /is_derive_unique <-. Qed.
+
+Global Instance diff_mult (U : NormedModule R_AbsRing) (f g lf lg : U -> R)
+  p : diff f (locally p) lf -> diff g (locally p) lg ->
+  diff (fun q => (f q) * (g q)) (locally p)
+    (fun q => ((lf q) * (g p)) + ((f p) * (lg q))).
+Proof. exact: filterdiff_mult_fct Rmult_comm. Qed.
+
+Global Instance deriv_mult (f g : R -> R) x df dg :
+  deriv f x df -> deriv g x dg ->
+  deriv (fun y => (f y) * (g y)) x (df * (g x) + (f x) * dg).
+Proof. exact: is_derive_mult. Qed.
+
+Coercion INR : nat >-> R.
+
+Global Instance deriv_pow (f : R -> R) n x l :
+  deriv f x l -> deriv (fun y => (f y) ^ n) x (n * l * ((f x) ^ n.-1)).
+Proof. exact: is_derive_pow. Qed.
+
+(* frequent composition *)
+Lemma is_derive_shift K (V : NormedModule K) (f : K -> V) (x : K) l
+  s :
+  deriv f (plus x s) l -> deriv (fun y => f (plus y s)) x l.
+Proof.
+move=> f'plus; apply: deriv_eq.
+by rewrite plus_zero_r scal_one.
 Qed.
 
 Section Cvg_to_set.
@@ -1252,8 +1358,6 @@ Qed.
 Definition is_bounded (K : AbsRing) (U : NormedModule K) (A : set U) :=
   exists M, forall p, A p -> norm p < M.
 
-Coercion INR : nat >-> R.
-
 Definition maxn_list (l : list nat) m := fold_left maxn l m.
 
 Lemma dflt_le_maxn_list l m : (m <= maxn_list l m)%N.
@@ -1343,16 +1447,25 @@ Qed.
 
 End Continuity.
 
+Lemma derive_ext_ge0_shift f g x y :
+  0 <= x -> 0 <= y -> (forall z, 0 <= z -> f z = g (y + z)) ->
+  Derive f x = Derive g (y + x).
+Proof.
+move=> xge0 yge0 feq_gshift.
+rewrite /Derive /Lim.
+apply/congr1/Lim_seq_ext_loc.
+exists O=> n _.
+rewrite !feq_gshift ?Rplus_assoc // /Rbar_loc_seq Rplus_0_l.
+apply: Rplus_le_le_0_compat=> //.
+exact/Rlt_le/RinvN_pos.
+Qed.
+
 Lemma derive_ext_ge0 f g x :
   0 <= x -> (forall y, 0 <= y -> f y = g y) -> Derive f x = Derive g x.
 Proof.
 move=> xge0 feqg.
-rewrite /Derive /Lim.
-apply/congr1/Lim_seq_ext_loc.
-exists O=> n _.
-rewrite !feqg // /Rbar_loc_seq Rplus_0_l.
-apply: Rplus_le_le_0_compat=> //.
-exact/Rlt_le/RinvN_pos.
+rewrite -[x in RHS]Rplus_0_l; apply: derive_ext_ge0_shift xge0 (Rle_refl _) _.
+by move=> ?; rewrite Rplus_0_l; apply: feqg.
 Qed.
 
 Section Monotonicity.
@@ -1392,12 +1505,12 @@ apply/Ropp_lt_contravar/MlbfR.
 exact: imageP.
 Qed.
 
-Lemma nincr_function_le (f : R -> R) (a b : Rbar) (df : R -> R) :
-  (forall x : R, Rbar_le a x -> Rbar_le x b -> is_derive f x (df x)) ->
-  (forall x : R, Rbar_le a x -> Rbar_le x b -> df x <= 0) ->
+Lemma nincr_function_le (f : R -> R) (a b : Rbar) :
+  (forall x : R, Rbar_le a x -> Rbar_le x b -> ex_derive f x) ->
+  (forall x : R, Rbar_le a x -> Rbar_le x b -> Derive f x <= 0) ->
   forall x y : R, Rbar_le a x -> x <= y -> Rbar_le y b -> f y <= f x.
 Proof.
-move=> Df dfle0 x y alex xley yleb.
+move=> f_ex_deriv dfle0 x y alex xley yleb.
 apply/Rminus_le_0.
 have hbet z : Rmin y x <= z -> z <= Rmax y x -> Rbar_le a z /\ Rbar_le z b.
   move=> minlez zlemax.
@@ -1408,15 +1521,13 @@ have hbet z : Rmin y x <= z -> z <= Rmax y x -> Rbar_le a z /\ Rbar_le z b.
   apply: Rbar_le_trans yleb.
   apply: Rle_trans; first exact: zlemax.
   by rewrite Rmax_left //; apply: Rle_refl.
-case: (MVT_gen f y x df).
+case: (MVT_gen f y x (Derive f)).
 - move=> z [/Rlt_le minlez /Rlt_le zlemax].
-  by apply: Df; have /hbet [] := zlemax.
-- move=> z [minlez zlemax].
-  apply: derivable_continuous_pt.
-  exists (df z).
-  by apply/is_derive_Reals/Df; have /hbet [] := zlemax.
+  by apply/Derive_correct/f_ex_deriv; have /hbet [] := zlemax.
+- move=> z [minlez zlemax]; apply: derivable_continuous_pt; exists (Derive f z).
+  by apply/is_derive_Reals/Derive_correct/f_ex_deriv; have /hbet [] := zlemax.
 - move=> z [[minlez zlemax] ->].
-  rewrite -(Rmult_0_l (df z)) Rmult_comm.
+  rewrite -(Rmult_0_l (Derive f z)) Rmult_comm.
   apply: Rmult_le_compat_neg_l.
     by apply: dfle0; have /hbet [] := zlemax.
   exact: Rle_minus.

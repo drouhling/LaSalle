@@ -129,7 +129,7 @@ Variable F : U -> U.
 
 Definition is_sol (y : R -> U) :=
   (forall t, t < 0 -> y t = minus (scal 2 (y 0)) (y (- t))) /\
-  forall t, 0 <= t -> is_derive y t (F (y t)).
+  forall t, 0 <= t -> deriv y t (F (y t)).
 
 (* compact set used in LaSalle's invariance principle *)
 Variable K : set U.
@@ -254,36 +254,20 @@ move=> sAK p [q Aq plimp] t tge0.
 by exists q => //; apply: invariant_pos_limit_set => //; apply: sAK.
 Qed.
 
-Lemma stable_limS (V : U -> R) (V' : U -> U -> R) :
-  (forall p : U, K p -> filterdiff V (locally p) (V' p)) ->
-  (forall p : U, K p -> (V' p \o F) p <= 0) ->
-  limS K `<=` [set p | (V' p \o F) p = 0].
+Lemma stable_limS (V : U -> R) :
+  continuous_on K V ->
+  (forall p t, K p -> 0 <= t -> ex_derive (V \o (sol p)) t) ->
+  (forall (p : U), K p -> Derive (V \o (sol p)) 0 <= 0) ->
+  limS K `<=` [set p | Derive (V \o (sol p)) 0 = 0].
 Proof.
-move=> Vdif V'le0 p [q Kq plimp].
-have Vsol' r : K r -> forall t, 0 <= t ->
-    is_derive (V \o sol r) t ((V' (sol r t) \o F) (sol r t)).
-  move=> Kr t tge0; have Krt : K (sol r t) by apply: Kinvar.
-  (* We should have rewriting rules for differentiation,
-     otherwise it introduces evars... *)
-  apply: filterdiff_ext_lin.
-  apply: filterdiff_comp'.
-    by have /sol_is_sol [_] := Kr; apply.
-  exact: Vdif.
-  move=> u; rewrite linear_scal //.
-  by have /Vdif [] := Krt.
+move=> Vcont Vsol_ex_deriv Vsol'le0 p [q Kq plimp].
 have ssqRpK : sol q @` Rle 0 `<=` K.
   by move=> _ [t tge0 <-]; apply: Kinvar.
 suff : exists l, cluster (sol q @ +oo) `<=` V @^-1` [set l].
-  move=> [l Vpliml]; rewrite -[p]sol0; set y := sol p.
-  rewrite -[LHS](is_derive_unique (V \o y) 0).
-    rewrite (@derive_ext_ge0 _ (fun=> l)); first exact: Derive_const.
-      exact: Rle_refl.
-    by move=> t tge0; apply/Vpliml/invariant_pos_limit_set.
-  apply: Vsol'=> //; last exact: Rle_refl.
-  by apply: compact_closed; last exact: sub_plim_clos_invar plimp.
-have Vcont : continuous_on K V.
-  apply: continuous_on_forall => r Kr.
-  by apply: filterdiff_continuous; exists (V' r); apply: Vdif.
+  move=> [l Vpliml].
+  rewrite (@derive_ext_ge0 _ (fun=> l)); first exact: Derive_const.
+    exact: Rle_refl.
+  by move=> t tge0; apply/Vpliml/invariant_pos_limit_set.
 suff [l Vsoltol] : [cvg V \o sol q @ +oo].
   exists l; apply: (c0_cvg_cst_on_pos_lim_set Vcont)=> //.
   exact: compact_closed hU Kco.
@@ -291,8 +275,13 @@ apply: nincr_lb_cvg.
   move=> s t [sge0 slet].
   apply: (@nincr_function_le _ (Finite 0) (Finite t))=> //; last first.
   - exact: Rle_refl.
-  - by move=> t' t'ge0 _; apply: (V'le0 (sol q t')); apply: Kinvar.
-  - by move=> t' t'ge0 _; apply: Vsol'.
+  - move=> t' t'ge0 _.
+    suff <- : Derive (V \o (sol (sol q t'))) 0 = Derive (V \o (sol q)) t'.
+      exact/Vsol'le0/Kinvar.
+    rewrite -[t' in RHS]Rplus_0_r.
+    apply: derive_ext_ge0_shift; [apply: Rle_refl|apply: t'ge0|].
+    by move=> ??; rewrite /funcomp -solD // Rplus_comm.
+  - by move=> t' t'ge0 _; apply: Vsol_ex_deriv.
 have: compact (V @` K) by apply: continuous_compact.
 move=> /compact_bounded [N hN].
 exists (- N)=> _ [t tge0 <-].
