@@ -53,13 +53,13 @@ Definition V (p : U) :=
 Lemma V_continuous (p : U) : continuous V p.
 Proof. exact/filterdiff_continuous/ex_diff. Qed.
 
-Variable p0 : U.
+Variable k0 : R.
 Let B := ke * ((Rmin (kv / (ke * (M + m))) (2 * m * g * l)) ^ 2) / 2.
 (* restriction to make fctrl smooth *)
-Hypothesis p0_valid : V p0 < B.
+Hypothesis k0_valid : k0 < B.
 
 Definition K : set U :=
-  [set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1 /\ V p <= V p0].
+  [set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1 /\ V p <= k0].
 
 Lemma pow_continuous n x : continuous (pow^~ n) x.
 Proof.
@@ -90,14 +90,14 @@ rewrite Rabs_minus_sym; apply: p3e2_sp3he; apply: ball_le (Rmin_r e1 _) _ _.
 exact: pme12_q.
 Qed.
 
-Lemma is_closed_Vpreim_leVp0 : is_closed (V @^-1` (Rle^~ (V p0))).
+Lemma is_closed_Vpreim_lek0 : is_closed (V @^-1` (Rle^~ k0)).
 Proof.
 apply: continuous_closed_preimage; first exact: V_continuous.
 apply: closed_is_closed; apply: closed_le.
 Qed.
 
 Lemma is_closed_K : is_closed K.
-Proof. exact: is_closed_setI is_closed_circ is_closed_Vpreim_leVp0. Qed.
+Proof. exact: is_closed_setI is_closed_circ is_closed_Vpreim_lek0. Qed.
 
 Lemma bounded_poly a b c d :
   0 < a -> exists M, forall x, a * (x ^ 2) - (b * Rabs x) - c < d -> Rabs x < M.
@@ -145,7 +145,7 @@ have [M1 K0123ltM1] : exists M1, forall p, K p ->
     apply/(Rlt_div_r (p[0] ^ 2)) => //.
     rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
     rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
-    apply: Rle_lt_trans p0_valid; apply: Rle_trans Vps.
+    apply: Rle_lt_trans k0_valid; apply: Rle_trans Vps.
     rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat_r.
     by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
       apply: Rlt_le; apply: is_pos_div_2.
@@ -156,7 +156,7 @@ have [M1 K0123ltM1] : exists M1, forall p, K p ->
     apply/(Rlt_div_r (p[1] ^ 2)) => //.
     rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
     rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
-    apply: Rle_lt_trans p0_valid; apply: Rle_trans Vps.
+    apply: Rle_lt_trans k0_valid; apply: Rle_trans Vps.
     rewrite -[X in X <= _]Rplus_0_l [X in _ <= X]Rplus_comm -Rplus_assoc.
     apply: Rplus_le_compat_r.
     by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
@@ -193,7 +193,7 @@ have : E p < sqrt (2 * B / ke).
   apply/(Rlt_div_r ((E p) ^ 2)) => //.
   rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
   rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
-  apply: Rle_lt_trans p0_valid; apply: Rle_trans Vps.
+  apply: Rle_lt_trans k0_valid; apply: Rle_trans Vps.
   rewrite -[X in X <= _]Rplus_0_r [V _]Rplus_assoc; apply: Rplus_le_compat_l.
   by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
     apply: Rlt_le; apply: is_pos_div_2.
@@ -388,7 +388,7 @@ have Vsolps_geB : B <= V (sol p s).
 have sgt0 : 0 < s.
   have /Rle_lt_or_eq_dec := sge0; case=> // seq0; exfalso.
   apply: Rlt_not_le Vsolps_geB; rewrite -seq0 sol0.
-  exact: Rle_lt_trans (proj2 Kp) p0_valid.
+  exact: Rle_lt_trans (proj2 Kp) k0_valid.
 have Vsol_derive : forall t, Rmin 0 s < t < Rmax 0 s ->
   deriv (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
   move=> t; rewrite Rmin_left => //; rewrite Rmax_right => // - [tgt0 tlts].
@@ -408,7 +408,7 @@ have : (V (sol p s) - V p) / s <= 0.
   exact/Rlt_le.
 apply/Rlt_not_le/Rdiv_lt_0_compat => //.
 apply: Rlt_Rminus; apply: Rlt_le_trans Vsolps_geB.
-exact: Rle_lt_trans (proj2 Kp) p0_valid.
+exact: Rle_lt_trans (proj2 Kp) k0_valid.
 Qed.
 
 Lemma deriv_Vsol p t :
@@ -522,7 +522,7 @@ split; last by rewrite -{2}[(sol p t)[3]]Rmult_1_r;
   apply/not_eq_sym/Rlt_not_eq/Mp_ms_gt0.
 have [circsolt Vsolts] : K (sol p t).
   by apply: Kinvar tge0; apply: subset_limSK_K.
-by apply: fctrl_wdef circsolt _; apply: Rle_lt_trans p0_valid.
+by apply: fctrl_wdef circsolt _; apply: Rle_lt_trans k0_valid.
 Qed.
 
 Lemma div_fctrl_mP p t : limS sol K p -> 0 <= t ->
@@ -930,7 +930,7 @@ have : 2 * (V (sol p t)) / ke < (2 * m * g * l) ^ 2.
   apply/Rlt_div_l => //; rewrite Rmult_comm; apply/Rlt_div_r => //.
   have Vsolp_s : V (sol p t) < B.
     have [_ Vsolp_s] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
-    exact: Rle_lt_trans p0_valid.
+    exact: Rle_lt_trans k0_valid.
   apply: Rlt_le_trans Vsolp_s _.
   rewrite /B Rmult_comm ![_ * _ / _]Rmult_assoc; apply/Rmult_le_compat_r.
     by apply: Rdiv_le_0_compat; [apply: Rlt_le|apply: Rgt_lt].
