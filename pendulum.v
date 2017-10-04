@@ -434,7 +434,18 @@ by rewrite -Ropp_0; apply/Ropp_le_contravar/Rlt_le.
 Qed.
 
 Definition homoclinic_orbit : set (vect_UniformSpace R_UniformSpace 5) :=
-  [set p : U | p[0] = 0 /\ p[1] = 0 /\ E p = 0].
+  [set p : U | p[0] = 0 /\ p[1] = 0 /\
+    (1 / 2) * m * (l ^ 2) * (p[4] ^ 2) = m * g * l * (1 - p[2])].
+
+Lemma homoclinicE :
+  homoclinic_orbit = [set p : U | p[0] = 0 /\ p[1] = 0 /\ E p = 0].
+Proof.
+apply/funext => p; apply/propext; split.
+  move=> [p0eq0 [p1eq0 /Rminus_diag_eq homoeq]]; split=> //; split=> //.
+  by rewrite -homoeq /E p1eq0; field.
+move=> [p0eq0 [p1eq0 Epeq0]]; split=> //; split=> //.
+by apply: Rminus_diag_uniq; rewrite -Epeq0 /E p1eq0; field.
+Qed.
 
 Lemma limSKinvar : is_invariant sol (limS sol K).
 Proof.
@@ -949,7 +960,7 @@ Qed.
 
 Lemma subset_limSK_homoclinic_orbit : limS sol K `<=` homoclinic_orbit.
 Proof.
-move=> p limSKp.
+move=> p limSKp; rewrite homoclinicE.
 case: (Req_dec (E p) 0) => [Ep0|Epn0].
   have := sol1_eq0 limSKp (Rle_refl _); rewrite sol0 => p10.
   have := Efctrl_psol0_eq0 limSKp (Rle_refl _).
