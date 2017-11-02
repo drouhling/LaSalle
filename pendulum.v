@@ -161,7 +161,7 @@ have [M1 K0123ltM1] : exists M1, forall p, K p ->
     apply: Rplus_le_compat_r.
     by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
       apply: Rlt_le; apply: is_pos_div_2.
-  split; apply: Rlt_le_trans (Rmax_l _ _); apply: Rle_lt_trans (Rlt_n_Sn _);
+  split; apply: Rlt_le_trans (Rmax_l _ _); apply: Rle_lt_trans (Rlt_n_Sn 1);
     rewrite -sqrt_Rsqr_abs Rsqr_pow2 -sqrt_1 -circp;
     apply: sqrt_le_1_alt.
     rewrite -[X in X <= _]Rplus_0_r; apply: Rplus_le_compat_l.
@@ -323,11 +323,11 @@ Proof.
 move=> Kp tge0; have [_ /(_ _ tge0) sol_att] := sol_is_sol sol0 solP Kp.
 apply: deriv_eq.
 have : ((sol p t)[2] ^ 2) + ((sol p t)[3] ^ 2) = 1 by apply: circ_invar.
-rewrite -[1](Rplus_minus ((sol p t)[2] ^ 2)) => /Rplus_eq_reg_l circp.
+rewrite -{1}[1](Rplus_minus ((sol p t)[2] ^ 2))=> /Rplus_eq_reg_l circp.
 rewrite !mxE circp /zero /minus /plus /opp /=; field.
 split.
   by rewrite -{2}[(sol p t)[2]]Rmult_1_r -circp; apply/Rgt_not_eq/Mp_ms_gt0.
-split; apply/Rgt_not_eq => //; field_simplify; lra.
+apply/Rgt_not_eq => //; field_simplify; lra.
 Qed.
 
 Lemma is_deriv_Vsol p t :
@@ -485,7 +485,8 @@ Lemma sol1_eq0 p t : limS sol K p -> 0 <= t -> (sol p t)[1] = 0.
 Proof.
 move=> limSKp tge0; suff : - kd * ((sol p t)[1] ^ 2) = 0.
   move=> /Rmult_integral; apply: or_ind.
-    by move=> / RMicromega.Ropp_0 kd0; exfalso; apply: (Rgt_not_eq kd 0) kd0.
+    move/Ropp_eq_0_compat; rewrite Ropp_involutive => kd0; exfalso.
+    exact: (Rgt_not_eq kd 0).
   by rewrite /= Rmult_1_r => /Rmult_integral; apply: or_ind.
 have /subset_limSK_K Kp := limSKp.
 rewrite -[LHS](is_derive_unique (V \o sol p) t); last exact: deriv_Vsol tge0.
@@ -536,19 +537,18 @@ have [circsolt Vsolts] : K (sol p t).
 by apply: fctrl_wdef circsolt _; apply: Rle_lt_trans k0_valid.
 Qed.
 
+Lemma Rinv_elim x y z : y <> 0 -> x / y = z <-> z * y = x.
+Proof. by move=> yne0; split=> <-; field. Qed.
+
 Lemma div_fctrl_mP p t : limS sol K p -> 0 <= t ->
   (sol p t)[3] * (g * (sol p t)[2] - l * ((sol p t)[4] ^ 2)) =
   (fctrl (sol p t)) / m.
 Proof.
-move=> limSKp tge0; apply/Logic.eq_sym/RMicromega.Rinv_elim.
-  exact/Rinv_neq_0_compat/Rgt_not_eq.
-rewrite Rinv_involutive; last exact/Rgt_not_eq.
+move=> limSKp tge0; apply/Logic.eq_sym/Rinv_elim; first exact: Rgt_not_eq.
 have := sol1'_eq0 limSKp tge0; rewrite !mxE /=.
-have IMp_ms_n0 : / (M + m * ((sol p t)[3] ^ 2)) <> 0.
-  exact/Rinv_neq_0_compat/Rgt_not_eq/Mp_ms_gt0.
-move=> /RMicromega.Rinv_elim - /(_ IMp_ms_n0).
-rewrite Rmult_0_l => fctrl_val; have {fctrl_val} := Logic.eq_sym fctrl_val.
-by move=> /Rplus_opp_r_uniq ->; ring.
+have Mp_ms_n0 : (M + m * ((sol p t)[3] ^ 2)) <> 0 by apply/Rgt_not_eq/Mp_ms_gt0.
+move=> /Rinv_elim - /(_ Mp_ms_n0); rewrite Rmult_0_l.
+by move=> /(@Logic.eq_sym _ 0) /Rplus_opp_r_uniq ->; ring.
 Qed.
 
 Lemma Fpendulum4E p t : limS sol K p -> 0 <= t ->
@@ -556,8 +556,8 @@ Lemma Fpendulum4E p t : limS sol K p -> 0 <= t ->
 Proof.
 move=> limSKp tge0; rewrite !mxE /=.
 have divfm_val := div_fctrl_mP limSKp tge0.
-have /RMicromega.Rinv_elim := Logic.eq_sym divfm_val.
-move<-; last exact/Rinv_neq_0_compat/Rgt_not_eq.
+have /Rinv_elim := Logic.eq_sym divfm_val.
+move<-; last exact/Rgt_not_eq.
 field_simplify_eq.
   suff -> : (sol p t)[2] ^ 2 = 1 - ((sol p t)[3] ^ 2) by ring.
   suff [<- _] : K (sol p t) by ring.
@@ -890,7 +890,7 @@ move=> limSKp Epn0 t tge0.
 have Kp : K p by apply: subset_limSK_K.
 have [_ /(_ _ tge0) sol't] := sol_is_sol sol0 solP Kp.
 have /Rmult_integral : (sol p t)[3] * (sol p t)[4] = 0.
-  apply: RMicromega.Ropp_0; rewrite Ropp_mult_distr_l.
+  rewrite -[LHS]Ropp_involutive Ropp_mult_distr_l; apply/Ropp_eq_0_compat.
   apply: (derive_nneg_eq (En0_sol2_const limSKp Epn0) tge0); last first.
     exact: is_derive_const.
   by apply: deriv_eq; rewrite mxE.
