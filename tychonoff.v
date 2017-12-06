@@ -78,99 +78,99 @@ Definition cluster (F : set (set T)) (p : T) :=
 
 End TopologicalSpaceTheory.
 
-Module FilteredSpace.
+(* Module FilteredSpace. *)
 
-Record mixin_of (T : Type) := Mixin {
-  locally : T -> set (set T) ;
-  locally_filter : forall p : T, ProperFilter (locally p)
-}.
+(* Record mixin_of (T : Type) := Mixin { *)
+(*   locally : T -> set (set T) ; *)
+(*   locally_filter : forall p : T, ProperFilter (locally p) *)
+(* }. *)
 
-Notation class_of := mixin_of (only parsing).
+(* Notation class_of := mixin_of (only parsing). *)
 
-Section ClassDef.
+(* Section ClassDef. *)
 
-Structure type := Pack { sort; _ : class_of sort ; _ : Type }.
-Local Coercion sort : type >-> Sortclass.
-Definition class (cT : type) := let: Pack _ c _ := cT return class_of cT in c.
+(* Structure type := Pack { sort; _ : class_of sort ; _ : Type }. *)
+(* Local Coercion sort : type >-> Sortclass. *)
+(* Definition class (cT : type) := let: Pack _ c _ := cT return class_of cT in c. *)
 
-End ClassDef.
+(* End ClassDef. *)
 
-Module Exports.
+(* Module Exports. *)
 
-Coercion sort : type >-> Sortclass.
-Notation FilteredSpace := type.
+(* Coercion sort : type >-> Sortclass. *)
+(* Notation FilteredSpace := type. *)
 
-End Exports.
+(* End Exports. *)
 
-End FilteredSpace.
+(* End FilteredSpace. *)
 
-Export FilteredSpace.Exports.
+(* Export FilteredSpace.Exports. *)
 
-Section FilteredSpaceTheory.
+(* Section FilteredSpaceTheory. *)
 
-Context {T : FilteredSpace}.
+(* Context {T : FilteredSpace}. *)
 
-Definition locally (p : T) := FilteredSpace.locally (FilteredSpace.class T) p.
+(* Definition locally (p : T) := FilteredSpace.locally (FilteredSpace.class T) p. *)
 
-Global Instance locally_filter (p : T) : ProperFilter (locally p).
-Proof. exact: FilteredSpace.locally_filter. Qed.
+(* Global Instance locally_filter (p : T) : ProperFilter (locally p). *)
+(* Proof. exact: FilteredSpace.locally_filter. Qed. *)
 
-End FilteredSpaceTheory.
+(* End FilteredSpaceTheory. *)
 
-Section FilteredIsTopological.
+(* Section FilteredIsTopological. *)
 
-Context (T : FilteredSpace).
+(* Context (T : FilteredSpace). *)
 
-Definition filter_open (A : set T) := forall p, A p -> locally p A.
+(* Definition filter_open (A : set T) := forall p, A p -> locally p A. *)
 
-Lemma filter_op_setU (I : eqType) (f : I -> set T) :
-  (forall i, filter_open (f i)) -> filter_open (\bigcup_i f i).
-Proof.
-by move=> fop p [i _ /fop]; apply: filter_imp => q fiq; exists i.
-Qed.
+(* Lemma filter_op_setU (I : eqType) (f : I -> set T) : *)
+(*   (forall i, filter_open (f i)) -> filter_open (\bigcup_i f i). *)
+(* Proof. *)
+(* by move=> fop p [i _ /fop]; apply: filter_imp => q fiq; exists i. *)
+(* Qed. *)
 
-Lemma filter_op_setI (A B : set T) :
-  filter_open A -> filter_open B -> filter_open (A `&` B).
-Proof.
-by move=> Aop Bop p [/Aop p_A /Bop p_B]; apply: filter_and.
-Qed.
+(* Lemma filter_op_setI (A B : set T) : *)
+(*   filter_open A -> filter_open B -> filter_open (A `&` B). *)
+(* Proof. *)
+(* by move=> Aop Bop p [/Aop p_A /Bop p_B]; apply: filter_and. *)
+(* Qed. *)
 
-Lemma filter_op_setT : filter_open setT.
-Proof. by move=> ??; apply: filter_true. Qed.
+(* Lemma filter_op_setT : filter_open setT. *)
+(* Proof. by move=> ??; apply: filter_true. Qed. *)
 
-Definition filteredTopologyMixin :=
-  TopologicalSpace.Mixin filter_op_setU filter_op_setI filter_op_setT.
+(* Definition filteredTopologyMixin := *)
+(*   TopologicalSpace.Mixin filter_op_setU filter_op_setI filter_op_setT. *)
 
-Definition filteredTopologicalSpace :=
-  TopologicalSpace.Pack filteredTopologyMixin T.
+(* Definition filteredTopologicalSpace := *)
+(*   TopologicalSpace.Pack filteredTopologyMixin T. *)
 
-End FilteredIsTopological.
+(* End FilteredIsTopological. *)
 
-Section TopologicalIsFiltered.
+(* Section TopologicalIsFiltered. *)
 
-Context (T : TopologicalSpace).
+(* Context (T : TopologicalSpace). *)
 
-Definition topo_locally (p : T) (A : set T) :=
-  exists B, neighbour p B /\ B `<=` A.
+(* Definition topo_locally (p : T) (A : set T) := *)
+(*   exists B, neighbour p B /\ B `<=` A. *)
 
-Instance topo_locally_filter (p : T) : ProperFilter (topo_locally p).
-Proof.
-split; first by move=> A [B [[_ Bp] sBA]]; exists p; apply: sBA.
-split; first by exists setT; split=> //; apply: neighbour_setT.
-  move=> A B [C [p_C sCA]] [D [p_D sDB]].
-  exists (C `&` D); split; first exact: neighbour_setI.
-  by move=> q [/sCA Aq /sDB Bq]; split.
-move=> A B sAB [C [p_C sCA]].
-by exists C; split=> //; apply: subset_trans sAB.
-Qed.
+(* Instance topo_locally_filter (p : T) : ProperFilter (topo_locally p). *)
+(* Proof. *)
+(* split; first by move=> A [B [[_ Bp] sBA]]; exists p; apply: sBA. *)
+(* split; first by exists setT; split=> //; apply: neighbour_setT. *)
+(*   move=> A B [C [p_C sCA]] [D [p_D sDB]]. *)
+(*   exists (C `&` D); split; first exact: neighbour_setI. *)
+(*   by move=> q [/sCA Aq /sDB Bq]; split. *)
+(* move=> A B sAB [C [p_C sCA]]. *)
+(* by exists C; split=> //; apply: subset_trans sAB. *)
+(* Qed. *)
 
-Definition topologicalFilteredMixin :=
-  FilteredSpace.Mixin topo_locally_filter.
+(* Definition topologicalFilteredMixin := *)
+(*   FilteredSpace.Mixin topo_locally_filter. *)
 
-Definition topologicalFilteredSpace :=
-  FilteredSpace.Pack topologicalFilteredMixin T.
+(* Definition topologicalFilteredSpace := *)
+(*   FilteredSpace.Pack topologicalFilteredMixin T. *)
 
-End TopologicalIsFiltered.
+(* End TopologicalIsFiltered. *)
 
 Definition continuous (S T : TopologicalSpace) (f : S -> T) :=
   forall A : set T, open A -> open (f @^-1` A).
