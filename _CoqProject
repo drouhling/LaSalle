@@ -1,6 +1,6 @@
 -R . lasalle
-coquelicotComplements.v
+# coquelicotComplements.v
 lasalle.v
-vect.v
-tychonoff.v
-pendulum.v
+# vect.v
+# tychonoff.v
+# pendulum.v

@@ -1,135 +1,275 @@
 Require Import Reals.
-Require Import Lra.
-
-From Coquelicot Require Import Hierarchy Rcomplements Rbar Derive Continuity.
-From mathcomp Require Import ssreflect ssrbool ssrnat ssrfun eqtype.
-
-Require Import coquelicotComplements.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
+From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
+From mathcomp Require Import boolp reals Rstruct Rbar set posnum topology.
+From mathcomp Require Import hierarchy landau derive.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+Import GRing.Theory Num.Def Num.Theory.
 
-Import Classical_Pred_Type Classical_Prop.
-
-Local Open Scope R_scope.
 Local Open Scope classical_set_scope.
-
-Lemma ball_prod (U V : UniformSpace) (p p' : U) (q q' : V) eps :
-  ball (p, q) eps (p', q') <-> (ball p eps p') /\ (ball q eps q').
-Proof. by []. Qed.
-Local Notation "{ 'all' A }" := (forall p, A p : Prop) (at level 0).
 
 Section PositiveLimitingSet.
 
-Variable U : UniformSpace.
-
-Hint Resolve locally_ball.
+Variable U : uniformType.
 
 Definition pos_limit_set (y : R -> U) :=
-  \bigcap_(eps : posreal) \bigcap_(T : posreal)
-    [set p | Rlt T `&` (y @^-1` ball p eps) !=set0].
+  \bigcap_(eps in [set e | 0 < e]) \bigcap_(T in [set T | 0 < T])
+    [set p | ltr T `&` (y @^-1` ball p eps) !=set0].
 
-Lemma plim_set_cluster (y : R -> U) :
+Lemma plim_cluster (y : R -> U) :
   pos_limit_set y = cluster (y @ +oo).
 Proof.
-apply/funext=> p; apply/propext.
-split=> [plim_p A B [M yMinfty_A] [eps peps_B]|cluster_p eps _ T _].
-  wlog Mgt0 : M yMinfty_A / 0 < M.
-    move=> /(_ (Rmax M 1)) []; last (by move=> q ABq; exists q).
-      by move=> q /Rmax_Rlt [] /yMinfty_A.
-    exact: Rlt_le_trans Rlt_0_1 (Rmax_r _ _).
-  have [t [/yMinfty_A Ayt /peps_B Byt]] := plim_p eps I (mkposreal _ Mgt0) I.
-  by exists (y t).
-have [] := cluster_p (y @` Rlt T) (ball p eps);
-  first by exists T; apply: imageP.
-  exact: locally_ball.
-by move=> _ [[t tgtT <-] yt_eps_p]; exists t.
+rewrite predeqE => p; split.
+  move=> plim_p A B [M ygtM_A] /locallyP [e egt0 pe_B].
+  wlog Mgt0 : M ygtM_A / 0 < M; last first.
+    by have [t [/ygtM_A Ayt /pe_B Byt]] := plim_p _ egt0 _ Mgt0; exists (y t).
+  move=> /(_ (maxr M 1)) []; last by move=> q ?; exists q.
+    by move=> ?; rewrite ltr_maxl => /andP [/ygtM_A].
+  by rewrite ltr_maxr orbC ltr01.
+move=> clyp e egt0 T Tgt0.
+have [] := clyp (y @` ltr T) (ball p e); first by exists T; apply: imageP.
+  by rewrite -locally_ballE; exists e.
+by move=> _ [[t ? <-] ?]; exists t.
 Qed.
 
-Lemma nonempty_pos_limit_set y (A : set U) :
+(* mathcomp/analysis issue: should be inferred *)
+Instance infty_proper : ProperFilter [filter of +oo].
+Proof. exact: Rbar_locally_filter. Qed.
+
+Lemma plimn0 y (A : set U) :
   compact A -> (y @ +oo) A -> cluster (y @ +oo) !=set0.
-Proof. by move=> cA /cA [p []]; exists p. Qed.
+Proof. by move=> Aco /Aco [p []]; exists p. Qed.
 
-Lemma closed_pos_lim_set (y : R -> U) : is_closed (cluster (y @ +oo)).
+(* to mathcomp/analysis: generalize closed_bigI *)
+Lemma closed_bigsetI (T : topologicalType) (I : Type) (D : set I)
+  (f : I -> set T) :
+  (forall i, D i -> closed (f i)) -> closed (\bigcap_(i in D) f i).
 Proof.
-by rewrite clusterE; apply: is_closed_bigcap => ??; apply: is_closed_closure.
+move=> fcl t clft i Di; have /fcl := Di; apply.
+by move=> A /clft [s [/(_ i Di)]]; exists s.
 Qed.
 
-Lemma cvg_to_pos_limit_set y (A : set U) :
+Lemma closed_plim (y : R -> U) : closed (cluster (y @ +oo)).
+Proof.
+by rewrite clusterE; apply: closed_bigsetI => ??; apply: closed_closure.
+Qed.
+
+(* to mathcomp/analysis *)
+Lemma subset_D0 A (X Y : set A) : (X `<=` Y) = (X `\` Y = set0).
+Proof.
+rewrite propeqE; split=> [sXY|XDY0 a].
+  by rewrite predeqE => ?; split=> // - [?]; apply; apply: sXY.
+by apply: contrapTT => nYa xA; rewrite -[False]/(set0 a) -XDY0.
+Qed.
+Lemma setIl0 A (X Y : set A) : X = set0 -> X `&` Y = set0.
+Proof. by move=> X0; rewrite predeqE => ?; split=> // - []; rewrite X0. Qed.
+Lemma bigII A I (D : set I) (f : I -> set A) (X : set A) :
+  D !=set0 -> \bigcap_(i in D) f i `&` X = \bigcap_(i in D) (f i `&` X).
+Proof.
+move=> [i Di]; rewrite predeqE => a; split=> [[Ifa Xa] j Dj|IfIXa].
+  by split=> //; apply: Ifa.
+by split=> [j /IfIXa [] | ] //; have /IfIXa [] := Di.
+Qed.
+Lemma open_interior (T : topologicalType) (A : set T) : open (locally^~ A).
+Proof.
+rewrite openE => p; rewrite locallyE => - [B [[Bop Bp]]].
+by move=> /locally_open - /(_ Bop); exists B.
+Qed.
+
+(* to mathcomp/analysis *)
+Definition ball_set (A : set U) e := \bigcup_(p in A) ball p e.
+Canonical set_filter_source :=
+  @Filtered.Source Prop _ U (fun A => locally_ ball_set A).
+
+Lemma filter_cluster (F : set (set U)) (A : set U) :
+  ProperFilter F -> F A -> compact A ->
+  forall e, 0 < e -> F (ball_set (cluster F) e).
+Proof.
+move=> FF FA; rewrite compact_In0 => Aco e egt0.
+set B := ball_set (cluster F) e.
+have Fn0 : F !=set0 by exists A.
+have /(setIl0 A) : cluster F `\` locally^~ B = set0.
+  rewrite -subset_D0 => p clFp.
+  by rewrite -locally_ballE; exists e => // ??; exists p.
+rewrite setIC clusterE [_ `\` _]bigII // setIC bigII // => IFBoA0.
+set f := fun C => closure C `&` ~` (locally^~ B) `&` A.
+have [G sGF IGBoA0] : exists2 G : {fset (set U)},
+  {subset G <= F} & \bigcap_(C in [set C | C \in G]) f C = set0.
+  have {IFBoA0} IFBoA0 : ~ (\bigcap_(C in F) f C !=set0).
+    by move=> [p IFBoAp]; rewrite -[False]/(set0 p) -IFBoA0.
+  have /Aco : closed_fam_of A F f.
+    exists (fun C => closure C `&` ~` (locally^~ B)).
+      move=> C _; apply: closedI (@closed_closure _ _) _.
+      exact/closedC/open_interior.
+    by move=> ? _; rewrite setIC.
+  move=> /contrap /(_ IFBoA0) /asboolPn /existsp_asboolPn [H /asboolPn].
+  move=> /imply_asboolPn [sHF IHBoA0]; exists H => //.
+  by rewrite predeqE => p; split=> // IHBoAp; apply: IHBoA0; exists p.
+have Gn0 : [set C | C \in G] !=set0.
+  apply/NNP => /asboolPn /forallp_asboolPn G0.
+  by rewrite -[False]/(@set0 U point) -IGBoA0 => ? /G0.
+move: IGBoA0; have -> : \bigcap_(C in [set C | C \in G]) f C =
+  \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` (locally^~ B)).
+  by rewrite predeqE => a; split=> IGBoAa ? /IGBoAa [[]].
+rewrite -bigII // -subset_D0 => sIGABo.
+suff : F (locally^~ B) by apply: filterS => ?; apply: locally_singleton.
+apply: filterS sIGABo _; apply: filter_bigI => C /sGF; rewrite in_setE => FC.
+by apply: filterI FA _; apply: filterS (@subset_closure _ C) _.
+Qed.
+
+Lemma cvg_to_plim (y : R -> U) (A : set U) :
   (y @ +oo) A -> compact A -> y @ +oo --> cluster (y @ +oo).
 Proof.
-move=> yinftyA coA B [eps sclepsB].
-by apply: filter_imp sclepsB _; apply: filter_cluster coA eps.
+move=> yinftyA coA B [e egt0 scleB].
+by apply: filterS scleB _; apply: filter_cluster coA _ egt0.
 Qed.
 
-(* Lemma cvg_to_pos_limit_set y (A : set U) : *)
+(* Lemma cvg_to_plim y (A : set U) : *)
 (*   (y @ +oo) A -> compact A -> y @ +oo --> cluster (y @ +oo). *)
 (* Proof. *)
-(* move=> yinftyA coA; apply: NNPP. *)
-(* case/not_all_ex_not=> B /(@imply_to_and (locally_set _ _)) [[eps plim_eps_B]]. *)
-(* move=> /not_ex_all_not nxinftyB. *)
+(* move=> yinftyA coA; apply/NNP. *)
+(* move=> /asboolPn /existsp_asboolPn [B] /asboolPn /imply_asboolPn. *)
+(* move=> [[e egt0 plim_e_B] /asboolPn /forallp_asboolPn nygtxB]. *)
 (* suff : ~` B `&` B !=set0 by case=> ? []. *)
-(* have proper_within_setC_B : ProperFilter (within (~` B) (y @ +oo)). *)
-(*   split=> [C [T snByCyT]|]; last exact: within_filter. *)
-(*   case /not_all_ex_not : (nyinftyB T) => t /(@imply_to_and (T < t)) [tgtT nByt]. *)
-(*   by exists (y t); exact: snByCyT. *)
-(* case: (coA _ _ proper_within_setC_B); first by exact: filter_le_within. *)
-(* move=> p [Ap plimnBp]; apply plimnBp; first by exists (mkposreal _ Rlt_0_1). *)
-(* exists eps=> q hq; apply: plim_eps_B; exists p => // C D yinftyC pD. *)
-(* by apply: plimnBp pD; apply: filter_le_within. *)
+(* have proper_within_CB : ProperFilter (within (~` B) (y @ +oo)). *)
+(*   apply: Build_ProperFilter=> C [T ygtTsBC]. *)
+(*   have /asboolPn /existsp_asboolPn [t /asboolPn /imply_asboolPn [tgtT nByt]] *)
+(*     := nygtxB T. *)
+(*   by exists (y t); apply: ygtTsBC. *)
+(* have [|p [Ap plimnBp]] := coA _ proper_within_CB. *)
+(*   exact: flim_within yinftyA. *)
+(* apply plimnBp; first exact: withinT. *)
+(* rewrite -locally_ballE; exists e => // q pe_q; apply: plim_e_B. *)
+(* by exists p => // C D yinftyC; apply/plimnBp; apply: flim_within yinftyC. *)
 (* Qed. *)
 
-Lemma sub_image_at_infty y (A : set U) : y @` Rle 0 `<=` A -> (y @ +oo) A.
-Proof. by move=> syRpA; exists 0 => t tgt0; apply/syRpA/imageP/Rlt_le. Qed.
+Lemma sub_image_at_infty y (A : set U) : y @` (>= 0) `<=` A -> (y @ +oo) A.
+Proof. by move=> syRpA; exists 0 => t tgt0; apply/syRpA/imageP/ltrW. Qed.
 
 Lemma sub_plim_clos_invar y (A : set U) :
-  y @` Rle 0 `<=` A -> cluster (y @ +oo) `<=` closure A.
+  y @` (>= 0) `<=` A -> cluster (y @ +oo) `<=` closure A.
 Proof. by move=> syRpA p ypp B /ypp; apply; apply: sub_image_at_infty. Qed.
 
-Lemma c0_cvg_cst_on_pos_lim_set A y (V : U -> R) (l : R) :
+(* to mathcomp/analysis ? *)
+Definition continuous_on (T U : topologicalType) (A : set T) (f : T -> U) :=
+  forall p, A p -> f @ (within A [filter of p]) --> f p.
+Lemma map_sub_cluster (S T : topologicalType) (F : set (set S)) (f : S -> T)
+  (A : set S) : Filter F -> continuous_on A f -> F A -> closed A ->
+  f @` (cluster F) `<=` cluster (f @ F).
+Proof.
+move=> Ffilt fcont FA Acl _ [p clFp <-] B C fFB.
+have Ap : A p by apply: Acl => ? /clFp - /(_ _ FA).
+move=> /(fcont _ Ap) fp_C.
+suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).
+exact: filterI.
+Qed.
+(* TODO: rename *)
+Lemma le_eps (R : realFieldType) (x y : R) :
+  (forall e, e > 0 -> x <= y + e) -> x <= y.
+Proof.
+move=> lexye; case: (lerP x y) => // ltyx.
+have /midf_lt [_] := ltyx; rewrite ltrNge -eqbF_neg => /eqP<-.
+suff -> : (y + x) / 2 = y + (x - y) / 2.
+  by apply/lexye/divr_gt0 => //; rewrite subr_gt0.
+by rewrite !mulrDl addrC -mulN1r -mulrA mulN1r [RHS]addrC {3}(splitr y)
+  [RHS]GRing.subrKA.
+Qed.
+Lemma between_eps (R : realFieldType) (x y z : R) :
+  (forall e, e > 0 -> x - e <= y <= z + e) -> x <= y <= z.
+Proof.
+move=> xyz_e; apply/andP.
+by split; apply: le_eps=> ? /xyz_e /andP []; rewrite ler_subl_addr.
+Qed.
+Lemma Rhausdorff : @hausdorff [topologicalType of R].
+Proof.
+move=> x y clxy; apply/eqP; rewrite eqr_le; apply: between_eps => _ /posnumP[e].
+rewrite -ler_distl -absRE; set he := (e%:num / 2)%:pos.
+have [z []] := clxy _ _ (locally_ball x he) (locally_ball y he).
+rewrite ball_absE /ball_ absrB => zx_he yz_he.
+rewrite (subr_trans z); apply: ler_trans (ler_abs_add _ _) _; apply/ltrW.
+by rewrite (splitr e%:num); apply: ltr_add.
+Qed.
+
+Lemma c0_cvg_cst_on_plim A y (V : U -> R) (l : R) :
   continuous_on A V -> V \o y @ +oo --> l ->
-  is_closed A -> y @` Rle 0 `<=` A -> cluster (y @ +oo) `<=` V @^-1` [set l].
+  closed A -> y @` (>= 0) `<=` A -> cluster (y @ +oo) `<=` V @^-1` [set l].
 Proof.
 move=> Vcont Vypl Acl syRpA p plimp.
 have Aypinfty : (y @ +oo) A by apply: sub_image_at_infty.
 have : (V @` cluster (y @ +oo)) (V p) by exists p.
 move=> /(map_sub_cluster _ Vcont Aypinfty Acl).
-by move=> /(filter_le_cluster Vypl) /Rhausdorff ->.
+by move=> /(flim_cluster Vypl) /Rhausdorff ->.
 Qed.
 
 End PositiveLimitingSet.
 
-Lemma bounded_pos_limit_set (K : AbsRing) (U : NormedModule K) (y : R -> U) :
-  is_bounded (y @` Rle 0) -> is_bounded (cluster (y @ +oo)).
+Lemma bounded_plim (K : absRingType) (V : normedModType K) (y : R -> V) :
+  bounded (y @` (>= 0)) -> bounded (cluster (y @ +oo)).
 Proof.
-move=> [M yRpleM]; exists (M + M) => p plimp.
-have Mgt0 : 0 < M.
-  apply: Rle_lt_trans (norm_ge_0 (y 1)) _.
-  by apply: yRpleM; exists 1 => //; apply: Rle_0_1.
-have [] := plimp (y @` Rle 0) (ball_norm p (mkposreal _ Mgt0)).
-    exact: sub_image_at_infty.
-  exact: locally_ball_norm.
-move=> _ [[t tge0 <-] pMyt].
-have -> : p = plus (y t) (opp (minus (y t) p)).
-  by rewrite -[LHS]plus_zero_r -(plus_opp_r (y t)) plus_comm -plus_assoc
-             opp_plus opp_opp.
-apply: Rle_lt_trans (norm_triangle (y t) (opp (minus (y t) p))) _.
-apply: Rplus_lt_compat; last by rewrite norm_opp.
-by apply: yRpleM; exists t.
+rewrite /bounded => - [N ybndN].
+wlog Ngt0 : N ybndN / 0 < N.
+  move=> bnd_plim; apply: (bnd_plim (maxr N 1)); last first.
+    by rewrite ltr_maxr orbC ltr01.
+  by move=> ?; rewrite ltr_maxl => /andP [/ybndN].
+near=> M.
+  move=> p plimp.
+  have [] := plimp (y @` (>= 0)) (ball_ norm p (PosNum Ngt0)%:num).
+      exact: sub_image_at_infty.
+    exact: locally_ball_norm.
+  move=> _ [[t tge0 <-] pN_yt]; rewrite -[p](subrK (y t)).
+  apply: ler_lt_trans (ler_normm_add _ _) _.
+  rewrite -ltr_subr_addr; apply: ltr_trans pN_yt _.
+  rewrite ltr_subr_addr addrC -ltr_subr_addr.
+  by apply: ybndN; [rewrite ltr_subr_addr; near: M|exists t].
+by end_near; exists (N + N).
+Qed.
+
+Lemma continuous_on_compact (S T : topologicalType) (f : S -> T) (A : set S) :
+  continuous_on A f -> compact A -> compact (f @` A).
+Proof.
+move=> fcont Aco F FF FfA; set G := filter_from F (fun C => A `&` f @^-1` C).
+have GF : ProperFilter G.
+  apply: (filter_from_proper (filter_from_filter _ _)); first by exists (f @` A).
+    move=> C1 C2 F1 F2; exists (C1 `&` C2); first exact: filterI.
+    by move=> ?[?[]]; split; split.
+  by move=> C /(filterI FfA) /filter_ex [_ [[p ? <-]]]; eexists p.
+case: Aco; first by exists (f @` A) => // ? [].
+move=> p [Ap clsGp]; exists (f p); split; first exact/imageP.
+move=> B C FB /(fcont _ Ap) /= p_Cf.
+have : G (A `&` f @^-1` B) by exists B.
+by move=> /clsGp /(_ p_Cf) [q [[Aq ?] /(_ Aq)]]; exists (f q).
 Qed.
 
 Section DifferentialSystem.
 
-Variable U : {normedModule R}.
-Let hU : hausdorff U := @hausdorff_normed_module _ U.
+(* to mathcomp/analysis *)
+Lemma hausdorff_normedModType (K : absRingType) (V : normedModType K) :
+  @hausdorff V.
+Proof.
+move=> p q clp_q; apply/subr0_eq/normm0_eq0/Rhausdorff => A B pq_A.
+rewrite -(@normm0 _ V); have <- : p - p = 0 by apply/eqP; rewrite subr_eq0.
+move=> pp_B.
+suff loc_preim r C :
+  locally `|[p - r]| C -> locally r ((fun r => `|[p - r]|) @^-1` C).
+  have [r []] := clp_q _ _ (loc_preim _ _ pp_B) (loc_preim _ _ pq_A).
+  by exists `|[p - r]|.
+move=> [e egt0 pre_C]; apply: locally_le_locally_norm; exists e => // s re_s.
+apply: pre_C; apply: ler_lt_trans (ler_distm_dist _ _) _.
+by rewrite [p - _]addrC opprB -addrA [p + _]addrC subrK addrC normmB.
+Qed.
+
+Variable U : normedModType R.
+Let hU : hausdorff := @hausdorff_normedModType _ U.
 
 (* function defining the differential system *)
 Variable F : U -> U.
 
-Definition is_sol (y : R -> U) :=
-  (forall t, t < 0 -> y t = minus (scal 2 (y 0)) (y (- t))) /\
-  forall t, 0 <= t -> deriv y t (F (y t)).
+Definition is_sol (y : R^o -> U) :=
+  (forall t, t < 0 -> y t = 2 *: (y 0) - (y (- t))) /\
+  forall t, 0 <= t -> derivable y t 1 /\ derive1 y t = F (y t).
 
 (* compact set used in LaSalle's invariance principle *)
 Variable K : set U.
@@ -153,97 +293,89 @@ Definition is_invariant A := forall p, A p -> forall t, 0 <= t -> A (sol p t).
 
 Hypothesis Kinvar : is_invariant K.
 
-(* Lemma sol_shift p t0 : *)
-(*   K p -> 0 <= t0 -> sol (sol p t0) = (fun t => sol p (t + t0)). *)
-(* Proof. *)
-(* move=> Kp t0ge0; apply: uniq_sol; *)
-(*   try apply: sol_is_sol; rewrite ?Rplus_0_l ?sol0 //; try exact: Kinvar. *)
-(* by move=> t; apply/is_derive_shift/(sol_is_sol Kp). *)
-(* Qed. *)
-
-(* Lemma solD p t0 t : K p -> 0 <= t0 -> sol p (t + t0) = sol (sol p t0) t. *)
-(* Proof. by move=> Kp t0ge0; rewrite sol_shift. Qed. *)
-
 Definition shift_sol p t0 t :=
-  match (Rle_lt_dec 0 t) with
-  | left _ => sol p (t + t0)
-  | right _ => minus (scal 2 (sol p t0)) (sol p (- t + t0))
-  end.
+  if t >= 0 then sol p (t + t0) else 2 *: (sol p t0) - (sol p (- t + t0)).
+
+(* to mathcomp/analysis *)
+Lemma nearN (R : absRingType) (P : set R) :
+  (\forall x \near (0 : R), P x) = (\forall x \near (0 : R), P (- x)).
+Proof.
+by rewrite propeqE; split=> /locallyP [e egt0 seP]; exists e => // x;
+  rewrite /AbsRing_ball /= sub0r -absrN -sub0r => /seP //; rewrite opprK.
+Qed.
 
 Lemma sol_shift p t0 : K p -> 0 <= t0 -> is_sol (shift_sol p t0).
 Proof.
 move=> Kp t0ge0; split=> [t tlt0|t tge0].
-  rewrite /shift_sol Ropp_0 Rplus_0_l Ropp_involutive.
-  case: (Rle_lt_dec 0 0) => [_|/Rlt_irrefl //].
-  case: (Rle_lt_dec 0 t) => [/Rle_not_lt //|_].
-  case: (Rle_lt_dec 0 (- t)) => [//|/Rlt_le].
-  by have /Ropp_gt_lt_0_contravar /Rgt_not_le := tlt0.
-split; first exact: is_linear_scal_l.
-move=> _ /is_filter_lim_locally_unique <- eps.
+  by rewrite /shift_sol lerNgt tlt0 lerr add0r ltrW ?oppr_gt0.
+suff dshift : (shift_sol p t0) \o shift t = cst (shift_sol p t0 t) +
+  (fun h => h *: F (shift_sol p t0 t)) +o_ (0 : R^o) id.
+  have dshiftE : 'd_(t : R^o) (shift_sol p t0) =
+    (fun h => h *: F (shift_sol p t0 t)) :> (R^o -> U).
+    have lin_scal : linear (fun h : R^o => h *: F (shift_sol p t0 t)).
+      by move=> ???; rewrite scalerDl scalerA.
+    have ->: (fun h : R^o => h *: F (shift_sol p t0 t)) = Linear lin_scal by [].
+    apply: diff_unique; first exact: scalel_continuous.
+    by apply/eqaddoE; rewrite dshift.
+  have diff_shift : differentiable (t : R^o) (shift_sol p t0).
+    apply/diff_locallyP; split; last by apply/eqaddoE; rewrite dshift dshiftE.
+    by rewrite dshiftE; apply: scalel_continuous.
+  by split; [apply/deriv1_diffP|rewrite derive1E' // dshiftE scale1r].
 have /sol_is_sol [_ solp] := Kp.
-have /solp [_ /(_ (t + t0)) h] : 0 <= t + t0 by apply: Rplus_le_le_0_compat.
-have /h /(_ eps) [e he] : is_filter_lim (locally (t + t0)) (t + t0) by [].
-rewrite /shift_sol; case: (Rle_lt_dec 0 t) => [_|/Rlt_not_le //].
-have minus_addr s : minus (s + t0) (t + t0) = minus s t.
-  by rewrite /minus /plus /opp /=; ring.
-have /Rle_lt_or_eq_dec := tge0; case=> [tgt0|teq0].
-  have hpos : 0 < Rmin (Rabs t) e.
-    by apply: Rmin_pos; [apply/Rabs_pos_lt/Rgt_not_eq/Rlt_gt|apply: cond_pos].
-  exists (mkposreal _ hpos) => s hs.
-  have sge0 : 0 <= s.
-    move: hs; rewrite /ball /= /AbsRing_ball /= /minus /plus /opp /abs /=.
-    move=> /Rabs_lt_between [/Rlt_minus_r hs _].
-    apply: Rlt_le; apply: Rle_lt_trans hs.
-    rewrite Rplus_comm; apply/(Rminus_le_0 _ t).
-    by apply: Rle_trans (Rmin_l _ _) _; rewrite Rabs_pos_eq //; apply: Rle_refl.
-  have /he : ball (t + t0) e (s + t0).
-    rewrite /ball /= /AbsRing_ball /= minus_addr.
-    by apply: Rlt_le_trans hs _; apply: Rmin_r.
-  by case: (Rle_lt_dec 0 s)=> [_|/Rlt_not_le //]; rewrite minus_addr.
-exists e => s hs; case: (Rle_lt_dec 0 s) => _.
-  have /he : ball (t + t0) e (s + t0).
-    by rewrite /ball /= /AbsRing_ball /= minus_addr; apply: hs.
-  by rewrite minus_addr.
-have /he : ball (t + t0) e (- s + t0).
-  move: hs.
-  by rewrite /ball /= /AbsRing_ball /= minus_addr -teq0 !minus_zero_r abs_opp.
-rewrite minus_addr -teq0 Rplus_0_l !minus_zero_r norm_opp.
-have -> : minus (minus (scal 2 (sol p t0)) (sol p (- s + t0))) (sol p  t0) =
-          minus (sol p t0) (sol p (- s + t0)).
-  rewrite [minus _ _]plus_comm plus_assoc -scal_opp_one -scal_distr_r.
-  have -> : plus (opp one) 2 = one by rewrite /plus /opp /one /=; ring.
-  by rewrite scal_one.
-by rewrite scal_opp_l -[X in minus X _]opp_minus -[X in norm X]opp_plus
-           norm_opp.
+have /solp [dsolp dsolpF] : 0 <= t + t0 by apply: addr_ge0 => //; apply: ltrW.
+rewrite /shift_sol tge0 -dsolpF -diff1E; last exact/deriv1_diffP.
+move: tge0; rewrite ler_eqVlt orbC => /orP [tgt0|/eqP teq0].
+  apply/eqaddoP => _ /posnumP[e]; near=> s.
+    rewrite -![(_ + _ : _ -> _) _]/(_ + _) /=.
+    have /deriv1_diffP /diff_locally := dsolp; rewrite funeqE=> /(_ s) /=.
+    rewrite addrA =>->; have -> /= : 0 <= s + t by near: s.
+    by rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
+  end_near; rewrite /= locally_simpl; last first.
+    case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _).
+    exact/eqoP.
+  exists t => // s; rewrite /AbsRing_ball /= absrB subr0 => ltst.
+  rewrite -ler_subl_addl sub0r; apply/ltrW; apply: ler_lt_trans ltst.
+  by rewrite absRE -normrN; apply: ler_norm.
+rewrite -teq0 add0r shift0; apply/eqaddoP => _ /posnumP[e]; near=> s.
+  rewrite -![(_ + _ : _ -> _) _]/(_ + _) /=.
+  have /deriv1_diffP /diff_locally := dsolp; rewrite -teq0 add0r.
+  rewrite funeqE => /(_ (- s)) /= ->.
+  have /deriv1_diffP /diff_locally := dsolp; rewrite -teq0 add0r.
+  rewrite funeqE => /(_ s) /= ->; case: (lerP 0 s) => [le0s|lts0].
+    by rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
+  rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _) _]/(- _) !addrA.
+  rewrite mulr2n scalerDl scale1r -[_ - _ - sol _ _]addrA -opprD subrr sub0r.
+  rewrite addrC linearN opprK addKr -[in X in _ <= X]normmN; near: s.
+end_near; rewrite /= locally_simpl.
+  by case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
+rewrite near_simpl -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
+by case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
 Qed.
 
 Lemma solD p t0 t :
   K p -> 0 <= t0 -> 0 <= t -> sol p (t + t0) = sol (sol p t0) t.
 Proof.
-move=> Kp t0ge0 tge0.
-have /sol_shift /(_ t0ge0) /solP := Kp.
-rewrite /shift_sol; case: (Rle_lt_dec 0 0) => [_|/Rlt_irrefl //].
-rewrite Rplus_0_l.
-have Ksolpt0 : K (sol p t0) by apply: Kinvar.
-by move=> /(_ Ksolpt0) <-; case: (Rle_lt_dec 0 t) => [_|/Rlt_not_le].
+move=> Kp t0ge0 tge0; have /sol_shift /(_ t0ge0) /solP := Kp.
+rewrite [shift_sol _ _ _]/shift_sol lerr add0r => <-; last exact: Kinvar.
+by rewrite /shift_sol tge0.
 Qed.
 
-Lemma invariant_pos_limit_set p : K p -> is_invariant (cluster (sol p @ +oo)).
+Lemma invariant_plim p : K p -> is_invariant (cluster (sol p @ +oo)).
 Proof.
 move=> Kp q plim_q t0 t0_ge0 A B [M].
 wlog Mge0 : M / 0 <= M => [sufMge0|] solpMinfty_A.
-  apply: (sufMge0 (Rmax 0 M)); first exact: Rmax_l.
-  by move=> x /Rmax_Rlt [_]; apply: solpMinfty_A.
+  apply: (sufMge0 (maxr 0 M)); first by rewrite ler_maxr lerr.
+  by move=> x; rewrite ltr_maxl => /andP [_]; apply: solpMinfty_A.
 have Kq : K q.
   apply: compact_closed => //.
-  by move=> C; apply: plim_q; exists 0 => t /Rlt_le tge0; apply: Kinvar.
+  by move=> C; apply: plim_q; exists 0 => t /ltrW tge0; apply: Kinvar.
 move=> /(sol_cont Kq) /plim_q q_Bsolt0.
-have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo) (sol p @` (Rlt M) `&` A).
+have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo) (sol p @` (> M) `&` A).
   by exists M => t tgtM; split; [apply: imageP|apply: solpMinfty_A].
-have tge0 : 0 <= t by apply: Rlt_le; apply: Rle_lt_trans tgtM.
+have tge0 : 0 <= t by apply/ltrW; apply: ler_lt_trans tgtM.
 have Ksolpt : K (sol p t) by apply: Kinvar.
-move=> /(_ Ksolpt); rewrite -solD // => Bsolpt0t; exists (sol p (t0 + t)).
-by split=> //; apply: solpMinfty_A; lra.
+move=> /(_ Ksolpt) /=; rewrite -solD // => Bsolpt0t; exists (sol p (t0 + t)).
+by split=> //; apply/solpMinfty_A/ltr_paddl.
 Qed.
 
 Definition limS (A : set U) := \bigcup_(q in A) cluster (sol q @ +oo).
@@ -251,52 +383,80 @@ Definition limS (A : set U) := \bigcup_(q in A) cluster (sol q @ +oo).
 Lemma invariant_limS A : A `<=` K -> is_invariant (limS A).
 Proof.
 move=> sAK p [q Aq plimp] t tge0.
-by exists q => //; apply: invariant_pos_limit_set => //; apply: sAK.
+by exists q => //; apply: invariant_plim => //; apply: sAK.
 Qed.
 
-Lemma stable_limS (V : U -> R) :
-  continuous_on K V ->
-  (forall p t, K p -> 0 <= t -> ex_derive (V \o (sol p)) t) ->
-  (forall (p : U), K p -> Derive (V \o (sol p)) 0 <= 0) ->
-  limS K `<=` [set p | Derive (V \o (sol p)) 0 = 0].
+Lemma nincr_lb_cvg (f : R -> R) :
+  (forall x y, 0 <= x <= y -> f y <= f x) ->
+  (exists M, f @` (>= 0) `<=` (> M)) -> cvg (f @ +oo).
 Proof.
-move=> Vcont Vsol_ex_deriv Vsol'le0 p [q Kq plimp].
-have ssqRpK : sol q @` Rle 0 `<=` K.
-  by move=> _ [t tge0 <-]; apply: Kinvar.
+move=> fnincr [M ltMf].
+apply/cvg_ex; exists (inf (fun x => x \in f @` (>= 0))).
+move=> A /locallyP [_ /posnumP[e] infe_A].
+have imf_inf : has_inf (fun x => x \in f @` (>= 0)).
+  apply/has_infP; split; first by exists (f 0); rewrite in_setE; apply: imageP.
+  by exists M; apply/lbP => ?; rewrite in_setE => /ltMf /ltrW.
+have := imf_inf => /inf_adherent /(_ [gt0 of e%:num]) [x].
+rewrite in_setE => - [t tge0 <-] ltftinfe; exists t => s ltts; apply: infe_A.
+rewrite ball_absE /= absrB absRE ger0_norm.
+  rewrite ltr_subl_addl.
+  by apply: ler_lt_trans ltftinfe; apply: fnincr; rewrite tge0 (ltrW ltts).
+rewrite subr_ge0 inf_lower_bound // in_setE; apply: imageP.
+by apply: ltrW; apply: ler_lt_trans ltts.
+Qed.
+
+(* todo: use directional derivative *)
+Lemma stable_limS (V : U -> R^o) :
+  continuous_on K V ->
+  (forall p t, K p -> 0 <= t -> derivable (V \o sol p : R^o -> R^o) t 1) ->
+  (forall (p : U), K p -> derive1 (V \o sol p) 0 <= 0) ->
+  limS K `<=` [set p | derive1 (V \o sol p) 0 = 0].
+Proof.
+move=> Vcont Vsol_drvbl Vsol'le0 p [q Kq plimp].
+have ssqRpK : sol q @` (>= 0) `<=` K by move=> _ [t tge0 <-]; apply: Kinvar.
+(* should be inferred *)
+have atrF := at_right_proper_filter 0.
 suff : exists l, cluster (sol q @ +oo) `<=` V @^-1` [set l].
-  move=> [l Vpliml].
-  rewrite (@derive_ext_ge0 _ (fun=> l)); first exact: Derive_const.
-    exact: Rle_refl.
-  by move=> t tge0; apply/Vpliml/invariant_pos_limit_set.
-suff [l Vsoltol] : [cvg V \o sol q @ +oo].
-  exists l; apply: (c0_cvg_cst_on_pos_lim_set Vcont)=> //.
-  exact: compact_closed hU Kco.
-apply: nincr_lb_cvg.
-  move=> s t [sge0 slet].
-  apply: (@nincr_function_le _ (Finite 0) (Finite t))=> //; last first.
-  - exact: Rle_refl.
-  - move=> t' t'ge0 _.
-    suff <- : Derive (V \o (sol (sol q t'))) 0 = Derive (V \o (sol q)) t'.
-      exact/Vsol'le0/Kinvar.
-    rewrite -[t' in RHS]Rplus_0_r.
-    apply: derive_ext_ge0_shift; [apply: Rle_refl|apply: t'ge0|].
-    by move=> ??; rewrite /funcomp -solD // Rplus_comm.
-  - by move=> t' t'ge0 _; apply: Vsol_ex_deriv.
-have: compact (V @` K) by apply: continuous_compact.
-move=> /compact_bounded [N hN].
-exists (- N)=> _ [t tge0 <-].
-have /hN : (V @` K) ((V \o sol q) t) by apply/imageP/Kinvar.
-by move=> /Rabs_def2 [].
+  move=> [l Vpliml]; rewrite derive1E /derive cvg_at_rightE; last first.
+    apply: Vsol_drvbl => //; apply: compact_closed => //.
+    exact: sub_plim_clos_invar plimp.
+  apply: flim_map_lim => A A0; rewrite !near_simpl; near=> h.
+    rewrite /= sol0 addr0 [_%:A]mulr1 Vpliml.
+      by rewrite Vpliml // subrr scaler0; apply: locally_singleton.
+    by apply: invariant_plim => //; apply: ltrW; near: h.
+  by end_near; rewrite /= locally_simpl; exists 1.
+suff cvVsol : cvg (V \o sol q @ +oo).
+  exists (lim (V \o sol q @ +oo)); apply: (c0_cvg_cst_on_plim Vcont)=> //.
+  exact: compact_closed.
+apply: nincr_lb_cvg; last first.
+  have: compact (V @` K) by apply: continuous_on_compact.
+  move=> /compact_bounded [N imVltN].
+  exists (- (N + 1))=> _ [t tge0 <-].
+  suff : `|(V \o sol q) t| < N + 1 by rewrite ltr_norml => /andP [].
+  by apply: imVltN; [rewrite ltr_addl|apply/imageP/Kinvar].
+move=> s t /andP [sge0 slet].
+apply: ler0_derive1_nincr (lerr _) slet (lerr _).
+  move=> r rst; apply: Vsol_drvbl => //; apply: ler_trans sge0 _.
+  by rewrite (itvP rst).
+move=> r rst; have rge0 : 0 <= r by apply: ler_trans sge0 _; rewrite (itvP rst).
+suff -> : derive1 (V \o sol q) r = derive1 (V \o (sol (sol q r))) 0.
+  exact/Vsol'le0/Kinvar.
+rewrite derive1E /derive cvg_at_rightE; last exact: Vsol_drvbl.
+rewrite derive1E /derive cvg_at_rightE; last first.
+  by apply: Vsol_drvbl => //; apply: Kinvar.
+congr (lim _); congr (default_filter_on_term _); rewrite predeqE /= => A; split.
+  move=> [_/posnumP[e] Ae]; exists e%:num => // x xe xgt0.
+  by rewrite sol0 addr0 -solD //; [apply: Ae|rewrite [_%:A]mulr1 ltrW].
+move=> [_/posnumP[e] Ae]; exists e%:num => // x xe xgt0.
+by have /Ae - /(_ xe) := xgt0; rewrite sol0 addr0 -solD // [_%:A]mulr1 ltrW.
 Qed.
 
 Lemma cvg_to_limS (A : set U) : compact A -> is_invariant A ->
-  forall p, A p -> sol p @ +oo --> limS A.
+  forall p, A p -> sol p @ +oo --> (limS A : set [uniformType of U]).
 Proof.
-move=> Aco Ainvar p Ap.
-apply: (@cvg_to_superset _ (cluster (sol p @ +oo))).
-  by move=> q plimq; exists p.
-apply: cvg_to_pos_limit_set Aco.
-by exists 0=> t /Rlt_le tge0; exact: Ainvar.
+move=> Aco Ainvar p Ap B [_/posnumP[e] limSeB].
+apply: (cvg_to_plim _ Aco); first by exists 0 => _/posnumP[?]; apply: Ainvar.
+by exists e%:num=> // q [r plimr re_q]; apply: limSeB; exists r => //; exists p.
 Qed.
 
 End DifferentialSystem.
