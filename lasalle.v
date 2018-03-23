@@ -166,27 +166,30 @@ move=> /(fcont _ Ap) fp_C.
 suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).
 exact: filterI.
 Qed.
-(* TODO: rename *)
-Lemma le_eps (R : realFieldType) (x y : R) :
-  (forall e, e > 0 -> x <= y + e) -> x <= y.
+Lemma ler_addgt0P (R : realFieldType) (x y : R) :
+  reflect (forall e, e > 0 -> x <= y + e) (x <= y).
 Proof.
-move=> lexye; case: (lerP x y) => // ltyx.
+apply/(iffP idP)=> [lexy _/posnumP[e] | lexye]; first by rewrite ler_paddr.
+case: (lerP x y) => // ltyx.
 have /midf_lt [_] := ltyx; rewrite ltrNge -eqbF_neg => /eqP<-.
 suff -> : (y + x) / 2 = y + (x - y) / 2.
   by apply/lexye/divr_gt0 => //; rewrite subr_gt0.
 by rewrite !mulrDl addrC -mulN1r -mulrA mulN1r [RHS]addrC {3}(splitr y)
   [RHS]GRing.subrKA.
 Qed.
-Lemma between_eps (R : realFieldType) (x y z : R) :
-  (forall e, e > 0 -> x - e <= y <= z + e) -> x <= y <= z.
+Lemma in_segmentP (R : realFieldType) (x y z : R) :
+  reflect (forall e, e > 0 -> y \in `[(x - e), (z + e)]) (y \in `[x, z]).
 Proof.
-move=> xyz_e; apply/andP.
-by split; apply: le_eps=> ? /xyz_e /andP []; rewrite ler_subl_addr.
+apply/(iffP idP)=> [xyz _/posnumP[e] | xyz_e].
+  rewrite inE; apply/andP; split; last by rewrite ler_paddr // (itvP xyz).
+  by rewrite ler_subl_addr ler_paddr // (itvP xyz).
+rewrite inE; apply/andP.
+by split; apply/ler_addgt0P => ? /xyz_e /andP []; rewrite ler_subl_addr.
 Qed.
 Lemma Rhausdorff : @hausdorff [topologicalType of R].
 Proof.
-move=> x y clxy; apply/eqP; rewrite eqr_le; apply: between_eps => _ /posnumP[e].
-rewrite -ler_distl -absRE; set he := (e%:num / 2)%:pos.
+move=> x y clxy; apply/eqP; rewrite eqr_le; apply/in_segmentP => _ /posnumP[e].
+rewrite inE -ler_distl -absRE; set he := (e%:num / 2)%:pos.
 have [z []] := clxy _ _ (locally_ball x he) (locally_ball y he).
 rewrite ball_absE /ball_ absrB => zx_he yz_he.
 rewrite (subr_trans z); apply: ler_trans (ler_abs_add _ _) _; apply/ltrW.
@@ -269,7 +272,7 @@ Variable F : U -> U.
 
 Definition is_sol (y : R^o -> U) :=
   (forall t, t < 0 -> y t = 2 *: (y 0) - (y (- t))) /\
-  forall t, 0 <= t -> derivable y t 1 /\ derive1 y t = F (y t).
+  forall t, 0 <= t -> is_derive (t : R^o) 1 y (F (y t)).
 
 (* compact set used in LaSalle's invariance principle *)
 Variable K : set U.
@@ -320,36 +323,49 @@ suff dshift : (shift_sol p t0) \o shift t = cst (shift_sol p t0 t) +
   have diff_shift : differentiable (t : R^o) (shift_sol p t0).
     apply/diff_locallyP; split; last by apply/eqaddoE; rewrite dshift dshiftE.
     by rewrite dshiftE; apply: scalel_continuous.
-  by split; [apply/deriv1_diffP|rewrite derive1E' // dshiftE scale1r].
+  apply: DeriveDef; first exact/derivable1_diffP.
+  by rewrite deriveE // dshiftE scale1r.
 have /sol_is_sol [_ solp] := Kp.
-have /solp [dsolp dsolpF] : 0 <= t + t0 by apply: addr_ge0 => //; apply: ltrW.
-rewrite /shift_sol tge0 -dsolpF -diff1E; last exact/deriv1_diffP.
+have /solp solp' : 0 <= t + t0 by apply: addr_ge0 => //; apply: ltrW.
+rewrite /shift_sol tge0.
 move: tge0; rewrite ler_eqVlt orbC => /orP [tgt0|/eqP teq0].
   apply/eqaddoP => _ /posnumP[e]; near=> s.
     rewrite -![(_ + _ : _ -> _) _]/(_ + _) /=.
-    have /deriv1_diffP /diff_locally := dsolp; rewrite funeqE=> /(_ s) /=.
-    rewrite addrA =>->; have -> /= : 0 <= s + t by near: s.
-    by rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
+    have /derivable_locally : derivable (sol p : R^o -> U) (t + t0) 1 by [].
+    rewrite funeqE => /(_ s) /=; rewrite addrA [_%:A]mulr1 =>->.
+    have -> /= : 0 <= s + t by near: s.
+    by rewrite derive_val addrC addrA [_ s + _]addrC subrr add0r; near: s.
   end_near; rewrite /= locally_simpl; last first.
     case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _).
-    exact/eqoP.
+    apply/eqoP; rewrite (eqo_locally' _ erefl) //.
+    rewrite /the_littleo /insubd; case: (insubP _) => //= _ _ -> /=.
+    by rewrite [_%:A]mulr1 add0r opprD addrA subrr scale0r subr0.
   exists t => // s; rewrite /AbsRing_ball /= absrB subr0 => ltst.
   rewrite -ler_subl_addl sub0r; apply/ltrW; apply: ler_lt_trans ltst.
   by rewrite absRE -normrN; apply: ler_norm.
 rewrite -teq0 add0r shift0; apply/eqaddoP => _ /posnumP[e]; near=> s.
-  rewrite -![(_ + _ : _ -> _) _]/(_ + _) /=.
-  have /deriv1_diffP /diff_locally := dsolp; rewrite -teq0 add0r.
-  rewrite funeqE => /(_ (- s)) /= ->.
-  have /deriv1_diffP /diff_locally := dsolp; rewrite -teq0 add0r.
-  rewrite funeqE => /(_ s) /= ->; case: (lerP 0 s) => [le0s|lts0].
+  rewrite -![(_ + _ : _ -> _) _]/(_ + _) /= -[t0]add0r teq0.
+  have /derivable_locally dsol : derivable (sol p : R^o -> U) (t + t0) 1 by [].
+  have := dsol; rewrite funeqE => /(_ (- s)) /=; rewrite [_%:A]mulr1 =>->.
+  have := dsol; rewrite funeqE => /(_ s) /=; rewrite [_%:A]mulr1 =>->.
+  rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
     by rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
   rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _) _]/(- _) !addrA.
   rewrite mulr2n scalerDl scale1r -[_ - _ - sol _ _]addrA -opprD subrr sub0r.
-  rewrite addrC linearN opprK addKr -[in X in _ <= X]normmN; near: s.
+  rewrite scaleNr opprK addrC addKr -[in X in _ <= X]normmN; near: s.
 end_near; rewrite /= locally_simpl.
-  by case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
+  case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
+  rewrite (eqo_locally' _ erefl) //.
+  rewrite /the_littleo /insubd; case: (insubP _) => //= _ _ -> /=.
+  by rewrite [_%:A]mulr1 add0r opprD addrA subrr scale0r subr0.
 rewrite near_simpl -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
-by case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
+case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
+rewrite (eqo_locally' _ erefl) //.
+rewrite {1}/the_littleo /insubd insubT /=.
+  by apply/asboolP/eq_some_oP; rewrite oppo.
+move=> _; apply/eqP; rewrite oppr_eq0; apply/eqP.
+rewrite /the_littleo /insubd; case: (insubP _) => //= _ _ -> /=.
+by rewrite [_%:A]mulr1 add0r opprD addrA subrr scale0r subr0.
 Qed.
 
 Lemma solD p t0 t :

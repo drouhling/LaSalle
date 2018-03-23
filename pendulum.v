@@ -1,23 +1,19 @@
-Require Import Reals Lra.
-From mathcomp Require Import ssreflect ssrfun eqtype ssrbool ssrnat bigop ssralg
-  matrix fintype zmodp seq.
-Require Import lasalle tychonoff coquelicotComplements vect.
-From Coquelicot Require Import Hierarchy Rcomplements Continuity Rbar Derive
-  Lub.
+Require Import Reals ssrring.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
+From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
+From mathcomp Require Import matrix zmodp.
+From mathcomp Require Import boolp reals Rstruct Rbar set posnum topology.
+From mathcomp Require Import hierarchy landau derive.
+Require Import lasalle.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+Import GRing.Theory Num.Def Num.Theory.
 
-Import Classical_Prop Classical_Pred_Type.
-
-Local Open Scope seq_scope.
-Local Open Scope ring_scope.
 Local Open Scope classical_set_scope.
 
-Notation "p [ i ]" := (p 0 (i%:R)) (at level 10).
-
-Local Open Scope R_scope.
+Notation "p ..[ i ]" := (p 0 (inZp i)) (at level 10).
 
 Section System.
 
@@ -29,274 +25,269 @@ Let U := 'rV[R]_5.
 
 (* p = (x, x', cos theta, sin theta, theta') *)
 Definition E (p : U) :=
-  (1 / 2) * ((M + m) * (p[1] ^ 2) + m * (l ^ 2) * (p[4] ^ 2)) +
-  m * l * p[1] * p[2] * p[4] + m * l * g * (p[2] - 1).
+  (1 / 2) * ((M%:num + m%:num) * (p..[1] ^+ 2) +
+  m%:num * (l%:num ^+ 2) * (p..[4] ^+ 2)) +
+  m%:num * l%:num * p..[1] * p..[2] * p..[4] +
+  m%:num * l%:num * g%:num * (p..[2] - 1).
 
 Definition fctrl (p : U) :=
-  (kv * m * p[3] * (g * p[2] - l * (p[4] ^ 2)) -
-   (M + m * (p[3] ^ 2)) * (kx * p[0] + kd * p[1])) /
-  (kv + (M + m * (p[3] ^ 2)) * ke * (E p)).
+  (kv%:num * m%:num * p..[3] * (g%:num * p..[2] - l%:num * (p..[4] ^+ 2)) -
+   (M%:num + m%:num * (p..[3] ^+ 2)) * (kx%:num * p..[0] + kd%:num * p..[1])) /
+  (kv%:num + (M%:num + m%:num * (p..[3] ^+ 2)) * ke%:num * (E p)).
 
 Definition Fpendulum (p : U) : U :=
   \row_(i < 5) nth 0
-   [:: p[1]
-     ; ((m * p[3] * (l * (p[4] ^ 2) - g * p[2]) + (fctrl p)) /
-        (M + m * (p[3] ^ 2)))
-     ; - p[3] * p[4]
-     ; p[2] * p[4]
-     ; (((M + m) * g * p[3] - p[2] * (m * l * (p[4] ^ 2) * p[3] + (fctrl p))) /
-        (l * (M + m * (p[3] ^ 2))))] i.
+   [:: p..[1]
+     ; ((m%:num * p..[3] * (l%:num * (p..[4] ^+ 2) - g%:num * p..[2]) +
+       (fctrl p)) / (M%:num + m%:num * (p..[3] ^+ 2)))
+     ; - p..[3] * p..[4]
+     ; p..[2] * p..[4]
+     ; (((M%:num + m%:num) * g%:num * p..[3] -
+       p..[2] * (m%:num * l%:num * (p..[4] ^+ 2) * p..[3] + (fctrl p))) /
+       (l%:num * (M%:num + m%:num * (p..[3] ^+ 2))))] i.
 
 Definition V (p : U) :=
-  (ke / 2) * ((E p) ^ 2) + (kv / 2) * (p[1] ^ 2) + (kx / 2) * (p[0] ^ 2).
+  (ke%:num / 2) * ((E p) ^+ 2) + (kv%:num / 2) * (p..[1] ^+ 2) +
+  (kx%:num / 2) * (p..[0] ^+ 2).
 
-Lemma V_continuous (p : U) : continuous V p.
-Proof. exact/filterdiff_continuous/ex_diff. Qed.
+Global Instance is_diff_component n i (p : 'rV[R]_n.+1) :
+  is_diff p (fun q => q..[i] : R^o) (fun q => q..[i]).
+Proof.
+have comp_lin : linear (fun q : 'rV[R]_n.+1 => q..[i] : R^o).
+  by move=> ???; rewrite !mxE.
+have comp_cont : continuous (fun q : 'rV[R]_n.+1 => q..[i] : R^o).
+  move=> q A [_/posnumP[e] Ae] /=; apply/locallyP; exists e%:num => //.
+  by move=> r /(_ ord0) /(_ (inZp i)) /Ae.
+apply: DiffDef; first exact: (@linear_differentiable _ _ (Linear comp_lin)).
+by rewrite (@diff_lin _ _ (Linear comp_lin)).
+Qed.
+
+Global Instance is_diff_component_comp (V : normedModType R) n
+  (f : V -> 'rV[R]_n.+1) i p df : is_diff p f df ->
+  is_diff p (fun q => (f q)..[i] : R^o) (fun q => (df q)..[i]).
+Proof.
+move=> dfp.
+have -> : (fun q => (f q)..[i]) = (fun v => v..[i]) \o f by rewrite funeqE.
+(* This should work *)
+(* apply: is_diff_eq. *)
+exact: is_diff_comp.
+Qed.
+
+Lemma deriveE' (V W : normedModType R) (f : V -> W) x v :
+  derive f x v = derive (fun h : R^o => f (h *: v + x)) 0 1.
+Proof.
+rewrite /derive.
+set g1 := fun h => h^-1 *: _; set g2 := fun h => h^-1 *: _.
+suff -> : g1 = g2 by [].
+by rewrite funeqE /g1 /g2 => h /=; rewrite addr0 scale0r add0r [_%:A]mulr1.
+Qed.
+
+Global Instance is_derive_component (V : normedModType R) n
+  (f : V -> 'rV[R]_n.+1) i x v df :
+  is_derive x v f df -> is_derive x v (fun q => (f q)..[i] : R^o) (df..[i]).
+Proof.
+move=> dfx.
+have diff_f : is_diff (0 : R^o) (fun h => f (h *: v + x)) ( *:%R^~ df ).
+  have /derivable1P/derivable1_diffP fdrvbl : derivable f x v by [].
+  by apply: DiffDef => //; rewrite diff1E // derive1E -deriveE' derive_val.
+apply: DeriveDef; first exact/derivable1P/derivable1_diffP.
+by rewrite deriveE' deriveE // diff_val scale1r.
+Qed.
+
+Lemma V_continuous : continuous V.
+Proof.
+by move=> ?; apply: (@differentiable_continuous _ [normedModType R of R^o]).
+Qed.
 
 Variable k0 : R.
-Let B := ke * ((Rmin (kv / (ke * (M + m))) (2 * m * g * l)) ^ 2) / 2.
+Let B := ke%:num * ((minr (kv%:num / (ke%:num * (M%:num + m%:num)))
+  (2 * m%:num * g%:num * l%:num)) ^+ 2) / 2.
 (* restriction to make fctrl smooth *)
 Hypothesis k0_valid : k0 < B.
 
 Definition K : set U :=
-  [set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1 /\ V p <= k0].
+  [set p : U | (p..[2] ^+ 2) + (p..[3] ^+ 2) = 1 /\ V p <= k0].
 
-Lemma pow_continuous n x : continuous (pow^~ n) x.
+Lemma expr_continuous n : continuous (fun x : R^o => x ^+ n.+1 : R^o).
 Proof.
-apply: ex_derive_continuous; exists (n * x ^ n.-1); apply: deriv_eq.
-by rewrite Rmult_1_r.
+move=> x; suff : differentiable x (fun y => y ^+ n.+1).
+  by apply: differentiable_continuous.
+suff -> : (fun y => y ^+ n.+1) = ((id : R^o -> R^o) ^+ n.+1) by [].
+by rewrite exprfunE.
 Qed.
 
-Hint Resolve cond_pos.
-
-Lemma is_closed_circ : is_closed ([set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1]).
+Lemma circle_closed : closed [set p : U | p..[2] ^+ 2 + p..[3] ^+ 2 = 1].
 Proof.
-move=> p clcircp; apply: Req_le_aux => e.
-have /pow_continuous [e1 p2e1_sp2he] :=
-  locally_ball (p[2] ^ 2) (mkposreal _ (is_pos_div_2 e)).
-have /pow_continuous [e2 p3e2_sp3he] :=
-  locally_ball (p[3] ^ 2) (mkposreal _ (is_pos_div_2 e)).
-have me12_gt0 : 0 < Rmin e1 e2 by apply: Rmin_pos.
+move=> p clcircp.
+apply: (@ball_norm_eq _ [normedModType R of R^o]) => e /=.
+have /expr_continuous [_/posnumP[e1] p2e1_sp2he] :=
+  locally_ball (p..[2] ^+ 2) (e%:num / 2)%:pos.
+have /expr_continuous [_ /posnumP[e2] p3e2_sp3he] :=
+  locally_ball (p..[3] ^+ 2) (e%:num / 2)%:pos.
 have [q [circq pme12_q]] :
-  [set p : U | (p[2] ^ 2) + (p[3] ^ 2) = 1] `&`
-  ball p (mkposreal _ me12_gt0) !=set0 by apply/clcircp/locally_ball.
-rewrite -circq /Rminus Ropp_plus_minus_distr Rplus_assoc
-  -[X in _ + X]Rplus_assoc [(p[3] ^ 2) + _]Rplus_comm Rplus_assoc -Rplus_assoc
-  [_ e]double_var.
-apply: Rle_trans (Rabs_triang _ _) _; apply: Rplus_le_compat; apply: Rlt_le.
-  rewrite Rabs_minus_sym; apply: p2e1_sp2he; apply: ball_le (Rmin_l _ e2) _ _.
-  exact: pme12_q.
-rewrite Rabs_minus_sym; apply: p3e2_sp3he; apply: ball_le (Rmin_r e1 _) _ _.
-exact: pme12_q.
+  [set p : U | p..[2] ^+ 2 + p..[3] ^+ 2 = 1] `&`
+  ball p (minr e1 e2) !=set0 by apply/clcircp/locally_ball.
+rewrite -circq opprD addrACA; apply: ler_lt_trans (ler_normm_add _ _) _.
+by rewrite (splitr e%:num) ltr_add //; [apply/p2e1_sp2he|apply/p3e2_sp3he];
+  apply: ball_ler (pme12_q _ _); rewrite ler_minl lerr // orbC.
 Qed.
 
-Lemma is_closed_Vpreim_lek0 : is_closed (V @^-1` (Rle^~ k0)).
+Lemma preimV_lek0_closed : closed (V @^-1` (<= k0)).
 Proof.
-apply: continuous_closed_preimage; first exact: V_continuous.
-apply: closed_is_closed; apply: closed_le.
+by apply: closed_comp; [move=> ??; apply: V_continuous|apply: closed_le].
 Qed.
 
-Lemma is_closed_K : is_closed K.
-Proof. exact: is_closed_setI is_closed_circ is_closed_Vpreim_lek0. Qed.
+Lemma K_closed : closed K.
+Proof. exact: closedI circle_closed preimV_lek0_closed. Qed.
 
-Lemma bounded_poly a b c d :
-  0 < a -> exists M, forall x, a * (x ^ 2) - (b * Rabs x) - c < d -> Rabs x < M.
+Lemma bounded_poly (a b c d : R) :
+  0 < a -> \forall M \near +oo, forall x,
+  a * (x ^+ 2) - (b * `|x|) - c < d -> `|x| < M.
 Proof.
 move=> agt0.
-have ptoinfty : (fun x => a * (x ^ 2) - (b * Rabs x) - c) @ +oo --> +oo.
-  move=> A [M sgtMA].
-  exists (Rmax (sqrt (Rmax (M + c) 0)) (((sqrt (Rmax (M + c) 0)) + b) / a)).
-  move=> x /Rmax_Rlt [Mpcltx Mpcltaxpb]; apply: sgtMA.
-  have xgt0 : 0 < x by apply: Rle_lt_trans (sqrt_pos _) Mpcltx.
-  rewrite Rabs_pos_eq; last exact/Rlt_le.
-  apply/Rlt_minus_r.
-  rewrite /= Rmult_1_r -Rmult_assoc /Rminus Ropp_mult_distr_l
-    -Rmult_plus_distr_r.
-  have : sqrt (Rmax (M + c) 0) < a * x - b.
-    by rewrite Rmult_comm; apply/Rlt_minus_r/Rlt_div_l.
-  move=> {Mpcltaxpb} Mpcltaxpb; move: Mpcltx => /Rlt_le Mpclex.
-  apply: Rle_lt_trans (Rmult_lt_compat_r _ _ _  xgt0 Mpcltaxpb).
-  apply: Rle_trans (Rmult_le_compat_l _ _ _ (sqrt_pos _) Mpclex).
-  by rewrite sqrt_def; [apply: Rmax_l|apply: Rmax_r].
-have mtoinfty : (fun x => a * (x ^ 2) - (b * Rabs x) - c) @ -oo --> +oo.
-  move=> A /ptoinfty [M sgtMAp]; exists (- M) => x.
-  rewrite -[X in X < _]Ropp_involutive => /Ropp_lt_cancel /sgtMAp.
-  by rewrite -Rsqr_pow2 -Rsqr_neg Rsqr_pow2 Rabs_Ropp.
-rewrite /filter_le /filtermap /= in ptoinfty.
-have dleatinfty : [filter of +oo] (Rle d) by exists d => ? /Rlt_le.
-have /ptoinfty [M1 sgtM1dlep] := dleatinfty.
-have /mtoinfty [M2 sltM2dlep] := dleatinfty.
-exists ((Rmax M1 (- M2)) + 1) => x pxltd.
-apply: Rle_lt_trans (Rlt_plus_1 _); apply/Rnot_gt_le => /Rmax_Rlt [M1ltx M2ltx].
-move: pxltd; apply/Rge_not_lt/Rle_ge; case: (Rle_lt_dec 0 x) => [xge0|xlt0].
-  by apply: sgtM1dlep; rewrite -(Rabs_pos_eq _ xge0).
-by apply/sltM2dlep/Ropp_lt_cancel; rewrite -[X in _ < X](Rabs_left _ xlt0).
+have ptoinfty : (fun x => a * (x ^+ 2) - (b * `|x|) - c) @ +oo --> +oo.
+  move=> A [M sgtMA]; rewrite !near_simpl; near=> x.
+  have lt0x : 0 < x by near: x.
+  rewrite ger0_norm ?ltrW //; apply: sgtMA.
+  rewrite ltr_subr_addr expr2 mulrA -mulrBl; apply: ler_lt_trans (ler_norm _) _.
+  rewrite -[ `|_|%R]sqr_sqrtr // expr2; apply: ltr_pmul=> //; last by near: x.
+  - exact: sqrtr_ge0.
+  - exact: sqrtr_ge0.
+  - by rewrite ltr_subr_addr -ltr_pdivr_mull //; near: x.
+end_near; rewrite /= locally_simpl; first by exists 0.
+    by exists (Num.sqrt `|M + c|).
+  by exists (a^-1 * (Num.sqrt `|M + c| + b)).
+have dleatinfty : [filter of +oo] (>= d) by exists d => ? /ltrW.
+have /ptoinfty [M1 sgtM1pged] := dleatinfty; near=> M.
+  move=> x pxltd; rewrite ltrNge; apply/negP => Mlex.
+  move: pxltd; rewrite ltrNge => /negP; apply.
+  rewrite -(@ger0_norm _ `|x|); last by apply: ler_trans Mlex; near: M.
+  rewrite -(@ger0_norm _ (_ ^+ 2)) ?sqr_ge0 // normrX; apply: sgtM1pged.
+  by apply: ltr_le_trans Mlex; near: M.
+by end_near; [exists 0 => ? /ltrW|exists M1].
 Qed.
 
-Lemma is_bounded_K : is_bounded K.
+Lemma normrM (R : realDomainType) (x y : R) : `|x * y|%R = `|x| * `|y|.
 Proof.
-have [M1 K0123ltM1] : exists M1, forall p, K p ->
-  Rabs (p[0]) < M1 /\ Rabs (p[1]) < M1 /\ Rabs (p[2]) < M1 /\ Rabs (p[3]) < M1.
-  exists (Rmax 2 (Rmax (sqrt (2 * B / kv)) (sqrt (2 * B / kx)))).
-  move=> p [circp Vps]; split.
-    do 2 ?[apply: Rlt_le_trans (Rmax_r _ _)].
-    rewrite -sqrt_Rsqr_abs Rsqr_pow2; apply: sqrt_lt_1_alt.
-    split; first exact: pow2_ge_0.
-    apply/(Rlt_div_r (p[0] ^ 2)) => //.
-    rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
-    rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
-    apply: Rle_lt_trans k0_valid; apply: Rle_trans Vps.
-    rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat_r.
-    by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
-      apply: Rlt_le; apply: is_pos_div_2.
+case: (ler0P x) => [xle0|xgt0]; case: (ler0P y) => [yle0|ygt0].
+- by rewrite mulrN mulNr opprK ger0_norm // mulr_le0.
+- by rewrite mulNr ler0_norm // pmulr_lle0.
+- by rewrite mulrN ler0_norm // pmulr_rle0.
+- by rewrite ger0_norm // pmulr_rge0 // ltrW.
+Qed.
+
+Lemma K_bounded : bounded K.
+Proof.
+suff : \forall M \near +oo, forall p, K p -> forall i, `|p ord0 i| < M.
+  rewrite /bounded; apply: filter_app; near=> M.
+    move=> Kbnd p /Kbnd ltpM; apply/bigmaxr_ltrP => [|i seqi].
+      by rewrite size_map -cardE card_prod !cardE !size_enum_ord.
+    rewrite (nth_map 0); last by move: seqi; rewrite size_map.
+    by rewrite ord1 ltpM.
+  by end_near.
+suff : \forall M \near +oo, forall p, K p -> `| p..[0] | < M /\
+  `| p..[1] | < M /\ `| p..[2] | < M /\ `| p..[3] | < M /\ `| p..[4] | < M.
+  apply: filter_app; near=> M.
+    move=> Kbnd p /Kbnd [ltp0M [ltp1M [ltp2M [ltp3M ltp4M]]]].
+    case; do 5 ?[case; first by move=> ?; rewrite -[ Ordinal _ ]natr_Zp Zp_nat].
+    by move=> n ?; suff : (n.+1.+4 < 5)%N by rewrite !ltnS ltn0.
+  by end_near.
+have K1bnd : \forall M \near +oo, forall p, K p -> `| p..[1] | < M.
+  near=> M.
+    move=> p [_ Vps].
+    suff /ltr_trans : `| p..[1] | < Num.sqrt (2 * B / kv%:num).
+      by apply; near: M.
+    rewrite absRE -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+    apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
+    by rewrite [V _]addrAC ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
+  by end_near; eexists => ?; apply.
+apply: filter_app (K1bnd); near=> M.
+  move=> K1ltM p Kp; have [circp Vps] := Kp; split.
+    suff /ltr_trans : `| p..[0] | < Num.sqrt (2 * B / kx%:num).
+      by apply; near: M.
+    rewrite absRE -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+    apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
+    by rewrite ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
+  split; first exact: K1ltM; split.
+    suff /ler_lt_trans : `| p..[2] | <= 1 by apply; near: M.
+    by rewrite absRE -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
   split.
-    apply: Rlt_le_trans (Rmax_r _ _); apply: Rlt_le_trans (Rmax_l _ _).
-    rewrite -sqrt_Rsqr_abs Rsqr_pow2; apply: sqrt_lt_1_alt.
-    split; first exact: pow2_ge_0.
-    apply/(Rlt_div_r (p[1] ^ 2)) => //.
-    rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
-    rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
-    apply: Rle_lt_trans k0_valid; apply: Rle_trans Vps.
-    rewrite -[X in X <= _]Rplus_0_l [X in _ <= X]Rplus_comm -Rplus_assoc.
-    apply: Rplus_le_compat_r.
-    by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
-      apply: Rlt_le; apply: is_pos_div_2.
-  split; apply: Rlt_le_trans (Rmax_l _ _); apply: Rle_lt_trans (Rlt_n_Sn 1);
-    rewrite -sqrt_Rsqr_abs Rsqr_pow2 -sqrt_1 -circp;
-    apply: sqrt_le_1_alt.
-    rewrite -[X in X <= _]Rplus_0_r; apply: Rplus_le_compat_l.
-    exact: pow2_ge_0.
-  rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat_r.
-  exact: pow2_ge_0.
-suff [M2 K4ltM2] : exists M2, forall p, K p -> Rabs (p[4]) < M2.
-  exists (Rmax M1 M2) => p Kp.
-  have /K0123ltM1 [p0ltM1 [p1ltM1 [p2ltM1 p3ltM1]]] := Kp.
-  have /K4ltM2 p4ltM2 := Kp.
-  apply: bigRmax_lt.
-    apply: Rlt_le_trans (Rmax_l _ _); apply: Rle_lt_trans p0ltM1.
-    exact: Rabs_pos.
-  case; do 4 ?[case; first by move=> ?; rewrite -[Ordinal _]natr_Zp;
-    apply: Rlt_le_trans (Rmax_l _ _)].
-  case; last by move=> n ltnp5; exfalso; move: ltnp5; rewrite !ltnS ltn0.
-  by move=> ?; rewrite -[Ordinal _]natr_Zp; apply: Rlt_le_trans (Rmax_r _ _).
-have hmslgt0 : 0 < (m * (l ^ 2) / 2).
-  apply: Rdiv_lt_0_compat Rlt_0_2; apply: Rmult_lt_0_compat => //.
-  by apply/pow2_gt_0/Rgt_not_eq.
-have [M2 sEsltM2] := bounded_poly (m * l * (M1 ^ 2)) (m * l * g * (M1 + 1))
-  (sqrt (2 * B / ke)) hmslgt0.
-exists M2 => p Kp; apply: sEsltM2.
-have [_ Vps] := Kp; have /K0123ltM1 [_ [p1ltM1 [p2ltM1 _]]] := Kp.
-have : E p < sqrt (2 * B / ke).
-  apply: Rle_lt_trans (Rle_abs _) _.
-  rewrite -sqrt_Rsqr_abs Rsqr_pow2; apply: sqrt_lt_1_alt.
-  split; first exact: pow2_ge_0.
-  apply/(Rlt_div_r ((E p) ^ 2)) => //.
-  rewrite [X in _ < X]Rmult_comm; apply/Rlt_div_l; first exact/Rlt_gt/Rlt_0_2.
-  rewrite [_ * _ / _]Rmult_assoc Rmult_comm.
-  apply: Rle_lt_trans k0_valid; apply: Rle_trans Vps.
-  rewrite -[X in X <= _]Rplus_0_r [V _]Rplus_assoc; apply: Rplus_le_compat_l.
-  by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos (pow2_ge_0 _);
-    apply: Rlt_le; apply: is_pos_div_2.
-apply: Rle_lt_trans; apply: Rplus_le_compat; last first.
-  apply: Rlt_le; rewrite !Ropp_mult_distr_r; apply: Rmult_lt_compat_l.
-    by do 2 ?[apply: Rmult_lt_0_compat => //].
-  rewrite Ropp_plus_distr; apply: Rplus_lt_compat_r.
-  by have /Rabs_def2 [] := p2ltM1.
-rewrite Rmult_plus_distr_l [1 / 2 * _ + _]Rplus_comm Rplus_assoc.
-have -> : 1 / 2 * (m * (l ^ 2) * (p[4] ^ 2)) = m * (l ^ 2) / 2 * (p[4] ^ 2).
-  by field.
-apply: Rplus_le_compat_l.
-rewrite -[X in X <= _]Rplus_0_l; apply: Rplus_le_compat.
-  apply: Rmult_le_pos; first exact: Rdiv_le_0_compat Rle_0_1 Rlt_0_2.
-  apply: Rmult_le_pos (pow2_ge_0 _).
-  by apply: Rplus_le_le_0_compat; apply/Rlt_le.
-rewrite Rmult_assoc Ropp_mult_distr_r [X in _ <= X]Rmult_assoc
-  [X in _ <= X]Rmult_assoc.
-apply: Rmult_le_compat_l; first by apply: Rmult_le_pos; apply: Rlt_le.
-case: (Rle_lt_dec 0 (p[4])) => [p4ge0|p4lt0].
-  rewrite Ropp_mult_distr_l -Rmult_assoc Rabs_pos_eq => //.
-  apply: Rmult_le_compat_r p4ge0 _; rewrite /= Rmult_1_r.
-  case: (Rle_lt_dec 0 (p[1])) => [p1ge0|/Rlt_le p1le0].
-    rewrite Ropp_mult_distr_r.
-    have /Rabs_def2 [_ /Rlt_le p2geoM] := p2ltM1.
-    apply: Rle_trans (Rmult_le_compat_l _ _ _ p1ge0 p2geoM).
-    rewrite Rmult_comm [X in _ <= X]Rmult_comm.
-    apply: Rmult_le_compat_neg_l; last by have /Rabs_def2 [/Rlt_le] := p1ltM1.
-    rewrite -Ropp_0; apply/Ropp_le_contravar/Rlt_le.
-    by apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
-  rewrite Ropp_mult_distr_l.
-  have /Rabs_def2 [/Rlt_le p2leM _] := p2ltM1.
-  apply: Rle_trans (Rmult_le_compat_neg_l _ _ _ p1le0 p2leM).
-  apply: Rmult_le_compat_r; last by have /Rabs_def2 [_ /Rlt_le] := p1ltM1.
-  by apply: Rlt_le; apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
-rewrite (Rabs_left _ p4lt0) Ropp_mult_distr_r Ropp_involutive -Rmult_assoc.
-rewrite Rmult_comm [X in _ <= X]Rmult_comm /= Rmult_1_r.
-apply: Rmult_le_compat_neg_l; first exact: Rlt_le.
-case: (Rle_lt_dec 0 (p[1])) => [p1ge0|/Rlt_le p1le0].
-  have /Rabs_def2 [/Rlt_le p2leM1 _] := p2ltM1.
-  apply: Rle_trans (Rmult_le_compat_l _ _ _ p1ge0 p2leM1) _.
-  apply: Rmult_le_compat_r; last by have /Rabs_def2 [/Rlt_le] := p1ltM1.
-  by apply: Rlt_le; apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
-have /Rabs_def2 [_ /Rlt_le p2geoM1] := p2ltM1.
-apply: Rle_trans (Rmult_le_compat_neg_l _ _ _ p1le0 p2geoM1) _.
-rewrite -Ropp_mult_distr_r Ropp_mult_distr_l.
-apply: Rmult_le_compat_r.
-  by apply: Rlt_le; apply: Rle_lt_trans p1ltM1; apply: Rabs_pos.
-rewrite -[X in _ <= X]Ropp_involutive; apply: Ropp_le_contravar.
-by have /Rabs_def2 [_ /Rlt_le] := p1ltM1.
+    suff /ler_lt_trans : `| p..[3] | <= 1 by apply; near: M.
+    by rewrite absRE -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addr sqr_ge0.
+  by move: p Kp {circp Vps}; near: M.
+end_near; rewrite /= !near_simpl; do ?[eexists => ?; exact].
+have [M1 sgtM1gtK1] := K1bnd.
+have := bounded_poly (m%:num * l%:num * ((`|M1| + 1) ^+ 2))
+  (m%:num * l%:num * g%:num * ((`|M1| + 1) + 1)) (Num.sqrt (2 * B / ke%:num))
+  [gt0 of m%:num * (l%:num ^+ 2) / 2].
+apply: filter_app; near=> M.
+  move=> sEsltM p Kp; have [circp Vps] := Kp; apply: sEsltM.
+  have : E p < Num.sqrt (2 * B / ke%:num).
+    apply: ler_lt_trans (ler_norm _) _.
+    rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+    apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
+    by rewrite -[V _]addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
+  apply: ler_lt_trans; apply: ler_add; last first.
+    rewrite -mulrN opprD ler_wpmul2l // ler_add2r ler_oppl.
+    rewrite ler_paddl // (ler_trans (ler_norm _)) // normrN.
+    by rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
+  rewrite mulrDr [1 / 2 * _ + _]addrC -addrA [1 / 2 * _]mulrCA mul1r mulrA.
+  rewrite (expr2 l%:num) ler_add2l; apply: ler_paddl.
+    by rewrite pmulr_rge0 // pmulr_rge0 // sqr_ge0.
+  rewrite -mulrN -!mulrA ler_wpmul2l // ler_wpmul2l // !mulrN ler_oppl.
+  suff : `| p..[1] | * (`| p..[2] | * `| p..[4] |) <=
+    (`|M1| + 1) * ((`|M1| + 1) * `| p..[4] |).
+    by apply: ler_trans; rewrite -!normrM -normrN ler_norm.
+  rewrite !mulrA ler_wpmul2r // ler_pmul //.
+    apply/ltrW/sgtM1gtK1 => //; apply: ler_lt_trans (ler_norm _) _.
+    by rewrite ltr_addl.
+  have /(ler_trans _) : 1 <= `|M1| + 1 by rewrite ler_addr.
+  by apply; rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
+by end_near.
 Qed.
 
-Lemma Kco : compact K.
-Proof. exact: bounded_closed_compact is_bounded_K is_closed_K. Qed.
+Lemma K_compact : compact K.
+Proof. exact: bounded_closed_compact K_bounded K_closed. Qed.
 
-Lemma Mp_ms_gt0 (p : U) : 0 < M + m * (p[3] ^ 2).
+Lemma Mp_ms_gt0 (p : U) : 0 < M%:num + m%:num * (p..[3] ^+ 2).
+Proof. by rewrite ltr_spaddl // pmulr_rge0 // sqr_ge0. Qed.
+
+Lemma ge0_expr_ndecr (R : realDomainType) n (x y : R) :
+  0 <= x <= y -> x ^+ n <= y ^+ n.
 Proof.
-apply: Rplus_lt_le_0_compat => //.
-by apply: Rmult_le_pos; [apply/Rlt_le|apply: pow2_ge_0].
+move=> /andP [xge0 yge0]; elim: n => [|n ihn]; first by rewrite !expr0.
+by rewrite !exprS ler_pmul // exprn_ge0.
 Qed.
 
-Lemma E_small p : V p < B -> Rabs (E p) < kv / (ke * (M + m)).
+Lemma E_small p : V p < B -> `|E p| < kv%:num / (ke%:num * (M%:num + m%:num)).
 Proof.
-move=> Vp_s; rewrite -[X in _ < X]Rabs_pos_eq; last first.
-  apply: Rdiv_le_0_compat; first exact/Rlt_le.
-  by apply: Rmult_lt_0_compat => //; apply: Rplus_lt_0_compat.
-apply: Rsqr_lt_abs_0; rewrite !Rsqr_pow2.
-have gt20 : 2 > 0 by apply/Rlt_gt/Rlt_0_2.
-have : 2 * (V p) / ke < (kv / (ke * (M + m))) ^ 2.
-  apply/Rlt_div_l => //; rewrite Rmult_comm; apply/Rlt_div_r => //.
-  apply: Rlt_le_trans Vp_s _.
-  rewrite /B Rmult_comm ![_ * _ / _]Rmult_assoc; apply/Rmult_le_compat_r.
-    by apply: Rdiv_le_0_compat; [apply: Rlt_le|apply: Rgt_lt].
-  apply: pow_incr; split; last exact: Rmin_l.
-  apply: Rmin_glb.
-    apply: Rdiv_le_0_compat; first exact: Rlt_le.
-    by apply: Rmult_lt_0_compat => //; apply: Rplus_lt_0_compat.
-  by do 3 ?[apply: Rmult_le_pos; last exact: Rlt_le]; apply: Rlt_le.
-apply: Rle_lt_trans; apply/(Rle_div_r (_ ^ 2)) => //.
-rewrite [X in _ <= X]Rmult_comm; apply/Rle_div_l; first exact/Rlt_gt/Rlt_0_2.
-rewrite [(_ ^ 2) * _ / _]Rmult_assoc Rmult_comm /V Rplus_assoc Rplus_comm.
-apply/Rle_minus_l; rewrite Rminus_eq_0.
-by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos; try exact: pow2_ge_0;
-  apply: Rdiv_le_0_compat; try exact: Rlt_0_2; apply/Rlt_le.
+move=> Vp_s; rewrite -ltr_sqr ?nnegrE // -normrX ger0_norm ?sqr_ge0 //.
+suff : 2 * (V p) / ke%:num < (kv%:num / (ke%:num * (M%:num + m%:num))) ^+ 2.
+  apply: ler_lt_trans.
+  rewrite ler_pdivl_mulr // -ler_pdivr_mull // mulrC -mulrA mulrC.
+  by rewrite /V -addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
+rewrite ltr_pdivr_mulr // mulrC -ltr_pdivl_mulr // (ltr_le_trans Vp_s) //.
+rewrite -mulrA mulrCA mulrA; apply: ler_pmul => //; apply: ler_pmul => //.
+apply/ge0_expr_ndecr/andP; split; last by rewrite ler_minl lerr.
+by rewrite ler_minr; apply/andP; split.
 Qed.
 
-Lemma fctrl_wdef (p : U) : (p[2] ^ 2) + (p[3] ^ 2) = 1 -> V p < B ->
-  kv + (M + m * (p[3] ^ 2)) * ke * (E p) <> 0.
+Lemma fctrl_wdef (p : U) : (p..[2] ^+ 2) + (p..[3] ^+ 2) = 1 -> V p < B ->
+  kv%:num + (M%:num + m%:num * (p..[3] ^+ 2)) * ke%:num * (E p) != 0.
 Proof.
-move=> circp Vp_s; rewrite Rmult_comm.
-move/Rplus_opp_r_uniq/(Rmult_eq_compat_r (/ ((M + m * (p[3] ^ 2)) * ke))).
-have Mmp3ke_gt0 : 0 < (M + m * p [3] ^ 2) * ke.
-  by apply: Rmult_lt_0_compat => //; apply: Mp_ms_gt0.
-rewrite Rmult_assoc Rinv_r; last exact/not_eq_sym/Rlt_not_eq.
-rewrite Rmult_1_r => Epval; have /E_small := Vp_s.
-rewrite Epval -Ropp_mult_distr_l Rabs_Ropp Rabs_pos_eq; last first.
-  apply: Rdiv_le_0_compat; first exact/Rlt_le.
-  by apply: Rmult_lt_0_compat => //; apply: Mp_ms_gt0.
-move/(Rmult_lt_reg_l _ _ _ (cond_pos _))/(Rinv_lt_cancel _ _ Mmp3ke_gt0).
-rewrite Rmult_comm; move/(Rmult_lt_reg_r _ _ _ (cond_pos _))/Rplus_lt_reg_l.
-rewrite -[X in X < _]Rmult_1_r; move/(Rmult_lt_reg_l _ _ _ (cond_pos _)).
-apply: Rle_not_lt; rewrite -circp.
-by apply/Rle_minus_l; rewrite Rminus_eq_0; apply: pow2_ge_0.
+move=> circp Vp_s; rewrite -normr_gt0.
+rewrite -[X in X + _](@mulfVK _ ((M%:num + m%:num * (p..[3] ^+ 2)) * ke%:num));
+  last by rewrite lt0r_neq0 // pmulr_rgt0 // Mp_ms_gt0.
+rewrite mulrC -mulrDr normrM pmulr_rgt0; last first.
+  by rewrite normrM pmulr_rgt0 gtr0_norm // Mp_ms_gt0.
+apply: ltr_le_trans (ler_sub_norm_add _ _).
+rewrite subr_gt0; apply: ltr_le_trans (E_small Vp_s) _.
+rewrite ger0_norm; last first.
+  by rewrite pmulr_rge0 // invr_ge0 pmulr_rge0 // Mp_ms_gt0.
+rewrite ler_pmul // lef_pinv ?posrE //; last by rewrite pmulr_rgt0 // Mp_ms_gt0.
+rewrite mulrC ler_pmul //; first exact/ltrW/Mp_ms_gt0.
+rewrite ler_add2l -{2}[m%:num]mulr1 ler_pmul // ?sqr_ge0 //.
+by rewrite -circp ler_addr sqr_ge0.
 Qed.
 
 (* TODO: show that Fpendulum is smooth in K and remove these hypotheses using
@@ -306,113 +297,162 @@ Hypothesis (sol0 : forall p, sol p 0 = p).
 Hypothesis solP : forall y, K (y 0) -> is_sol Fpendulum y <-> y = sol (y 0).
 Hypothesis sol_cont : forall t, continuous_on K (sol^~ t).
 
-Lemma circ_invar p :
-  K p -> forall t, 0 <= t -> (sol p t)[2] ^ 2 + (sol p t)[3] ^ 2 = 1.
+(* TODO: generalize *)
+Lemma eq0_derive1_cst (f : R^o -> R^o) (a b : R) :
+  (forall t, t \in `[a, b] -> is_derive (t : R^o) 1 f 0) ->
+  forall t, t \in `[a, b] -> f t = f a.
 Proof.
-move=> Kp t tge0; have [circp _] := Kp.
-rewrite -circp -[in RHS](sol0 p); apply: Logic.eq_sym.
-case: (Rle_lt_or_eq_dec _ _ tge0); last by move<-.
-apply: (eq_is_derive (fun s => ((sol p s)[2] ^ 2) + ((sol p s)[3] ^ 2))).
-move=> s [sge0 _]; have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp.
-by apply: deriv_eq; rewrite !mxE /plus /zero /=; ring.
+move=> f'eq0 t tab; apply/eqP; rewrite eqr_le; apply/andP; split.
+  by apply: (@ler0_derive1_nincr _ a b) => //; rewrite ?(itvP tab) //;
+    move=> ? /f'eq0 // df; rewrite derive1E derive_val.
+by apply: (@le0r_derive1_ndecr _ a b) => //; rewrite ?(itvP tab) //;
+  move=> ? /f'eq0 // df; rewrite derive1E derive_val.
 Qed.
 
-Lemma deriv_Esol p t :
-  K p -> 0 <= t -> deriv (E \o (sol p)) t ((sol p t)[1] * fctrl (sol p t)).
+Lemma circ_invar p :
+  K p -> forall t, 0 <= t -> (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1.
+Proof.
+move=> Kp t tge0; have [circp _] := Kp; rewrite -circp -[in RHS](sol0 p).
+apply (@eq0_derive1_cst (fun s => (sol p s)..[2] ^+ 2 + (sol p s)..[3] ^+ 2) _
+  t); last by rewrite inE lerr tge0.
+move=> s s0t; have sge0 : s >= 0 by rewrite (itvP s0t).
+have [_ /(_ _ sge0) dsol] := sol_is_sol sol0 solP Kp.
+apply: is_derive_eq.
+by rewrite !mxE /= [_ *: (_ * _)]mulrCA -!mulrDr addrC mulNr subrr.
+Qed.
+
+Lemma addrxx (R : ringType) (x : R) : x + x = 2 * x.
+Proof. by rewrite mulrDl mul1r. Qed.
+
+Lemma addl_eq (R : ringType) (x y z : R) : (x + y = z) = (x = z - y).
+  by rewrite propeqE; split=> [<-|->]; [rewrite addrK|rewrite subrK].
+Qed.
+
+Lemma divr_eq (F : fieldType) (x y z : F) :
+  y != 0 -> (x / y = z) = (z * y = x).
+Proof.
+move=> yne0; rewrite propeqE; split=> zyex.
+  by rewrite -[RHS](mulfVK yne0) zyex.
+by rewrite -zyex mulrAC mulfVK.
+Qed.
+
+Lemma is_derive_Esol p t :
+  K p -> 0 <= t -> is_derive (t : R^o) 1 (E \o (sol p) : _ -> R^o)
+  ((sol p t)..[1] * fctrl (sol p t)).
 Proof.
 move=> Kp tge0; have [_ /(_ _ tge0) sol_att] := sol_is_sol sol0 solP Kp.
-apply: deriv_eq.
-have : ((sol p t)[2] ^ 2) + ((sol p t)[3] ^ 2) = 1 by apply: circ_invar.
-rewrite -{1}[1](Rplus_minus ((sol p t)[2] ^ 2))=> /Rplus_eq_reg_l circp.
-rewrite !mxE circp /zero /minus /plus /opp /=; field.
-split.
-  by rewrite -{2}[(sol p t)[2]]Rmult_1_r -circp; apply/Rgt_not_eq/Mp_ms_gt0.
-apply/Rgt_not_eq => //; field_simplify; lra.
+apply: is_derive_eq.
+have /eqP : (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 by apply: circ_invar.
+rewrite eq_sym addrC -subr_eq => /eqP circp.
+have Mpmsne0 : M%:num + m%:num * (sol p t)..[3] ^+ 2 != 0.
+  by rewrite lt0r_neq0 // Mp_ms_gt0.
+rewrite subr0 !mxE /= -circp -![_ *: _]/(_ * _) invrM ?unitfE //; last first.
+  by rewrite circp.
+set q := sol _ _ _; set x := (M%:num + m%:num * _)^-1; set y := fctrl _.
+rewrite [x / _]mulrC; do ![rewrite ?[_ * (_ * x)]mulrA -?(mulrDl _ _ x)].
+rewrite [_ * (_ + _ * x)]mulrDr [_ * (_ * x)]mulrA [_ + _ * x]addrC.
+do 2 rewrite addrA -(mulrDl _ _ x).
+rewrite !addrxx mul1r mulrDr; do 2 rewrite [2^-1 * _]mulrCA.
+do 2 rewrite [2^-1 * _]mulrA mulVf // mul1r.
+rewrite [_ / _]mulrC ![_ * (_^-1 * _)]mulrA [_ * (_ / _ * _)]mulrA.
+rewrite -[_ + _ + _ * _ * _]addrA -mulrDl.
+rewrite [in _ * x]addrAC ![_ * (_ * (_ + _))]mulrA -mulrDl.
+rewrite -addrA [_ * (_ * (- _ * _))]mulrA -mulrDl.
+rewrite addl_eq divr_eq; last by rewrite circp.
+rewrite [LHS]mulrDl !mulNr mulrAC; apply/Logic.eq_sym; rewrite -addl_eq.
+rewrite [(_ + _) * _]mulrDr addrAC [_ + _ * y + _]addrAC addl_eq -mulrBl.
+rewrite [_ * (_ + y)]mulrDr opprD addrA [_ * (_ - _ * y)]mulrDr.
+rewrite addrA -[- (_ * y)]mulNr [_ * (_ * y)]mulrA.
+rewrite [_ + _ * y + _]addrAC addl_eq -mulrBl; apply/Logic.eq_sym.
+rewrite mulrN opprK mulrACA [_ ^+2 / _]mulrAC mulfVK //.
+by rewrite [_ / _]mulrC ![_^-1 * _]mulrA [_^-1 * _ * _]mulrC mulVKf //; ssring.
 Qed.
 
 Lemma is_deriv_Vsol p t :
   K p -> 0 <= t -> V (sol p t) < B ->
-  deriv (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
+  is_derive (t : R^o) 1 (V \o (sol p) : _ -> R^o)
+    (- kd%:num * ((sol p t)..[1] ^+ 2)).
 Proof.
 move=> Kp tge0 Vsolpt_s.
 have [_ /(_ _ tge0) sol_att] := sol_is_sol sol0 solP Kp.
-have Esol' := deriv_Esol Kp tge0; apply: deriv_eq.
-rewrite !mxE /zero /minus /plus /opp /= /fctrl; field.
-split.
-  have circp : ((sol p t)[2] ^ 2) + ((sol p t)[3] ^ 2) = 1 by apply: circ_invar.
-  exact: fctrl_wdef.
-by rewrite -{2}[(sol p t)[3]]Rmult_1_r; apply/not_eq_sym/Rlt_not_eq/Mp_ms_gt0.
+have Esol' := is_derive_Esol Kp tge0; apply: is_derive_eq.
+rewrite [in X in _ + X]mxE /= !addrxx -![_ *: _]/(_ * _).
+do 3 rewrite [_ / _]mulrC [_^-1 * _ * _]mulrCA -[_ ^-1 * _ * _]mulrA mulVKf //.
+rewrite [_ * fctrl _]mulrC [_ * Fpendulum _ _ _]mulrC mulrA mulrA -addrA.
+rewrite ![in X in _ + X]mulrA -!mulrDl expr2 [RHS]mulrA; congr (_ * _).
+rewrite addrA mxE /=.
+have Mpmsne0 : M%:num + m%:num * (sol p t)..[3] ^+ 2 != 0.
+  by rewrite lt0r_neq0 // Mp_ms_gt0.
+rewrite addl_eq [kv%:num * _]mulrA.
+rewrite -[_ * fctrl _](mulfVK Mpmsne0) [_ / _ * _]mulrAC -mulrDl divr_eq //.
+apply/Logic.eq_sym; rewrite [kv%:num * _]mulrDr addrA addrAC addl_eq mulrAC.
+rewrite -mulrDl /fctrl [LHS]mulrA.
+have circp : (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 by apply: circ_invar.
+by have fctrl_def := fctrl_wdef circp Vsolpt_s; rewrite divr_eq //; ssring.
 Qed.
 
 Lemma defset_invar p : K p -> forall t, 0 <= t ->
-  ((sol p t)[2] ^ 2) + ((sol p t)[3] ^ 2) = 1 /\ V (sol p t) < B.
+  (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 /\ V (sol p t) < B.
 Proof.
 move=> Kp t tge0; split; first exact: circ_invar.
-set A := [set t | 0 <= t /\ B <= V (sol p t)].
-have glbA := Glb_Rbar_correct A.
-suff t_ltA : Rbar_lt t (Glb_Rbar A).
-  apply: Rnot_le_lt => Vsolpt_ns; apply: Rbar_lt_not_le t_ltA _.
-  exact: (proj1 glbA).
-have : Glb_Rbar A <> m_infty.
-  move=> glbA_minfty; rewrite glbA_minfty in glbA.
-  have : Rbar_le 0 m_infty by apply: (proj2 glbA) => ? [].
-  exact: Rbar_lt_not_le.
-move: glbA; case: (Glb_Rbar A) => //= s s_glbA _; exfalso=> {t tge0}.
-have sge0 : Rbar_le 0 s by apply: (proj2 s_glbA) => ? [].
-have Vsolp_deriv t : 0 <= t -> ex_derive (V \o (sol p)) t.
-  move=> tge0; have [_ /(_ _ tge0) sol_att] := sol_is_sol sol0 solP Kp.
-  exact: ex_deriv.
-have Vsolps_geB : B <= V (sol p s).
-  case: (Rle_lt_dec B (V (sol p s))) => // Vsolps_ltB; exfalso.
-  have BmVsolps_gt0 : 0 < B - V (sol p s) by apply: Rlt_Rminus.
-  have Vsolp_conts : continuous (V \o (sol p)) s.
-    by apply/ex_derive_continuous/Vsolp_deriv.
-  have /Vsolp_conts := locally_ball (V (sol p s)) (mkposreal _ BmVsolps_gt0).
-  move=> [e /= se_Vsolp].
-  have : Rbar_le (s + e / 2) s.
-    apply: (proj2 s_glbA) => r [rge0 Vsolpr_ns]; apply: Rnot_lt_le => rlt_sphe.
-    have sler : Rbar_le s r by apply: (proj1 s_glbA).
-    have /se_Vsolp /Rabs_def2 [Vsolpr_s _] : ball s e r.
-      apply: Rabs_def1; last first.
-        have /Rminus_le_0 := sler; apply: Rlt_le_trans.
-        exact/Ropp_lt_gt_0_contravar/Rlt_gt.
-      have :  e / 2 <= e.
-        apply/Rle_div_l; first exact/Rlt_gt/Rlt_0_2.
-        rewrite -[X in X <= _]Rmult_1_r.
-        by apply: Rmult_le_compat_l; [apply/Rlt_le|apply/Rlt_le/Rlt_n_Sn].
-      by apply/Rlt_le_trans/Rlt_minus_l; rewrite Rplus_comm.
-    by apply: Rlt_not_le Vsolpr_ns; apply: Rplus_lt_reg_r Vsolpr_s.
-  apply/Rlt_not_le.
-  rewrite Rplus_comm; apply/Rlt_minus_l; rewrite Rminus_eq_0.
-  by apply/Rdiv_lt_0_compat; [|apply: Rlt_0_2].
-have sgt0 : 0 < s.
-  have /Rle_lt_or_eq_dec := sge0; case=> // seq0; exfalso.
-  apply: Rlt_not_le Vsolps_geB; rewrite -seq0 sol0.
-  exact: Rle_lt_trans (proj2 Kp) k0_valid.
-have Vsol_derive : forall t, Rmin 0 s < t < Rmax 0 s ->
-  deriv (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
-  move=> t; rewrite Rmin_left => //; rewrite Rmax_right => // - [tgt0 tlts].
-  apply: is_deriv_Vsol => //; first exact: Rlt_le.
-  apply: Rnot_le_lt => Vsolpt_ns; suff /Rlt_not_le : Rbar_le s t by apply.
-  by apply: (proj1 s_glbA); split => //; apply: Rlt_le.
-have : forall t, Rmin 0 s <= t <= Rmax 0 s -> continuity_pt (V \o (sol p)) t.
-  move=> t; rewrite Rmin_left => //; rewrite Rmax_right => // - [tge0 tles].
-  exact/continuity_pt_filterlim/ex_derive_continuous/Vsolp_deriv.
-move=> /(MVT_gen _ _ _ _ Vsol_derive) [t []].
-rewrite Rmin_left => //; rewrite Rmax_right => // - [tge0 tles].
-rewrite /funcomp sol0 Rminus_0_r; move/(Rmult_eq_compat_r (/ s)).
-rewrite Rinv_r_simpl_l=> [VsolpsVpds|]; last exact/not_eq_sym/Rlt_not_eq.
-have : (V (sol p s) - V p) / s <= 0.
-  rewrite /Rdiv VsolpsVpds -Ropp_mult_distr_l.
-  apply/Rge_le/Ropp_0_le_ge_contravar; apply: Rmult_le_pos (pow2_ge_0 _).
-  exact/Rlt_le.
-apply/Rlt_not_le/Rdiv_lt_0_compat => //.
-apply: Rlt_Rminus; apply: Rlt_le_trans Vsolps_geB.
-exact: Rle_lt_trans (proj2 Kp) k0_valid.
+set A := [pred t | (0 <= t) && (B <= V (sol p t))].
+case: (pselect (reals.nonempty A))=> [An0 |]; last first.
+  by move=> /asboolPn /forallp_asboolPn /(_ t) /negP; rewrite inE => /nandP [];
+    [rewrite tge0|rewrite -ltrNge].
+have infA : has_inf A.
+  by apply/has_infP; split=> //; exists 0; apply/lbP => ? /andP [].
+exfalso=> {t tge0}; have infge0 : 0 <= inf A.
+  by apply: lb_le_inf => //; apply/lbP => ? /andP [].
+have Vsolp_drvbl t : 0 <= t -> derivable (V \o (sol p) : R^o -> R^o) t 1.
+  by move=> tge0; have [_ /(_ _ tge0) sol_att] := sol_is_sol sol0 solP Kp.
+have Vsolpinf_geB : B <= V (sol p (inf A)).
+  case: (lerP B (V (sol p (inf A)))) => // Vsolpinf_ltB; rewrite falseE.
+  have Vsolp_cont : {for inf A, continuous (V \o (sol p))}.
+    suff /differentiable_continuous :
+      differentiable (inf A : R^o) (V \o sol p : _ -> R^o) by [].
+    exact/derivable1_diffP/Vsolp_drvbl.
+  have BmVsolps_gt0 : 0 < B - V (sol p (inf A)) by rewrite subr_gt0.
+  have /Vsolp_cont := locally_ball (V (sol p (inf A))) (PosNum BmVsolps_gt0).
+  move=> [_ /posnumP[e] /= infe_Vsolp].
+  suff : inf A + e%:num / 2 <= inf A.
+    by rewrite lerNgt => /negP; apply; rewrite ltr_addl.
+  apply: lb_le_inf An0 _; apply/lbP => s /andP [sge0 Vsolps_geB].
+  rewrite lerNgt; apply/negP => ltsinfphe; have leinfs : inf A <= s.
+    by apply: inf_lower_bound => //; rewrite inE sge0 Vsolps_geB.
+  suff /infe_Vsolp : ball (inf A) e%:num s.
+    rewrite ball_absE /= absrB absRE => /(ler_lt_trans (ler_norm _)).
+    by rewrite ltrNge => /negP; apply; rewrite ler_sub.
+  rewrite ball_absE /= absrB absRE ger0_norm ?subr_ge0 // ltr_subl_addl.
+  by apply: ltr_trans ltsinfphe _; rewrite ltr_add2l {2}[e%:num]splitr ltr_addl.
+have Vsol_drvbl t : t \in `]0, (inf A)[ ->
+  is_derive (t : R^o) 1 (V \o sol p : _ -> R^o)
+  (- kd%:num * (sol p t)..[1] ^+ 2).
+  move=> t0inf; apply: is_deriv_Vsol => //; first by rewrite (itvP t0inf).
+  rewrite ltrNge; apply/negP => Vsolpt_geB; suff : inf A <= t.
+    by rewrite lerNgt => /negP; apply; rewrite (itvP t0inf).
+  apply: inf_lower_bound => //; rewrite inE; apply/andP; split=> //.
+  by rewrite (itvP t0inf).
+have : {in `[0, (inf A)], continuous (V \o sol p)}.
+  move=> t t0inf; suff /differentiable_continuous :
+    differentiable (t : R^o) (V \o sol p : _ -> R^o) by [].
+  by apply/derivable1_diffP/Vsolp_drvbl; rewrite (itvP t0inf).
+move=> /(MVT infge0 Vsol_drvbl) [t t0inf].
+rewrite /funcomp sol0 subr0 => dVsol.
+have infgt0 : 0 < inf A.
+  rewrite ltr_def; apply/andP; split=> //.
+  apply/negP => /eqP infA0; have := Vsolpinf_geB.
+  rewrite lerNgt => /negP; apply; rewrite infA0 sol0.
+  by apply: ler_lt_trans k0_valid; have [] := Kp.
+have : V (sol p (inf A)) - V p <= 0.
+  by rewrite dVsol !mulNr oppr_le0 pmulr_lge0 // pmulr_rge0 // sqr_ge0.
+rewrite lerNgt => /negP; apply.
+rewrite subr_gt0; apply: ltr_le_trans Vsolpinf_geB.
+by apply: ler_lt_trans k0_valid; have [] := Kp.
 Qed.
 
-Lemma deriv_Vsol p t :
-  K p -> 0 <= t -> deriv (V \o (sol p)) t (- kd * ((sol p t)[1] ^ 2)).
+Lemma is_derive_Vsol p (t : R^o) :
+  K p -> 0 <= t -> is_derive t 1 (V \o sol p : _ -> R^o)
+  (- kd%:num * (sol p t)..[1] ^+ 2).
 Proof.
 move=> Kp tge0; have [circpt Vpts] := defset_invar Kp tge0.
 exact: is_deriv_Vsol.
@@ -421,559 +461,472 @@ Qed.
 Lemma Kinvar : is_invariant sol K.
 Proof.
 move=> p Kp t tge0; have [_ Vp_s] := Kp; split; first exact: circ_invar.
-apply: Rle_trans Vp_s; rewrite -[X in _ <= V X]sol0.
-have Vderiv : forall s, 0 <= s <= t ->
-  deriv (V \o (sol p)) s (- kd * ((sol p s)[1] ^ 2)).
-  by move=> s [sge0 slet]; apply: deriv_Vsol.
-apply: (@nincr_function_le (V \o (sol p)) (Finite 0) (Finite t)) => //;
-  try exact: Rle_refl.
-  by move=> s sge0 slet; have /Vderiv := conj sge0 slet; apply: ex_deriv.
-move=> s sge0 slet; have /Vderiv /is_derive_unique -> := conj sge0 slet.
-apply: Rmult_le_0_r; last exact: pow2_ge_0.
-by rewrite -Ropp_0; apply/Ropp_le_contravar/Rlt_le.
+apply: ler_trans Vp_s; rewrite -{2}[p]sol0.
+have Vsol_deriv : forall s, s \in `[0, t] ->
+  is_derive (s : R^o) 1 (V \o sol p : _ -> R^o)
+  (- kd%:num * (sol p s)..[1] ^+ 2) by move=> s /andP [/(is_derive_Vsol Kp)].
+apply: (@ler0_derive1_nincr (V \o sol p) 0 t);[idtac|idtac|by [] |by [] |by []].
+  by move=> ? /Vsol_deriv.
+move=> s /Vsol_deriv dVsols; rewrite derive1E derive_val.
+by rewrite !mulNr oppr_le0 pmulr_rge0 // sqr_ge0.
 Qed.
 
-Definition homoclinic_orbit : set (vect_UniformSpace R_UniformSpace 5) :=
-  [set p : U | p[0] = 0 /\ p[1] = 0 /\
-    (1 / 2) * m * (l ^ 2) * (p[4] ^ 2) = m * g * l * (1 - p[2])].
+Definition homoclinic_orbit : set U := [set p : U | p..[0] = 0 /\ p..[1] = 0 /\
+  (1 / 2) * m%:num * (l%:num ^+ 2) * (p..[4] ^+ 2) =
+  m%:num * g%:num * l%:num * (1 - p..[2])].
 
 Lemma homoclinicE :
-  homoclinic_orbit = [set p : U | p[0] = 0 /\ p[1] = 0 /\ E p = 0].
+  homoclinic_orbit = [set p : U | p..[0] = 0 /\ p..[1] = 0 /\ E p = 0].
 Proof.
-apply/funext => p; apply/propext; split.
-  move=> [p0eq0 [p1eq0 /Rminus_diag_eq homoeq]]; split=> //; split=> //.
-  by rewrite -homoeq /E p1eq0; field.
+rewrite predeqE => p; split.
+  move=> [p0eq0 [p1eq0 /eqP]]; rewrite -subr_eq0 => /eqP homoeq.
+  split=> //; split=> //; rewrite -homoeq /E p1eq0 expr0n /=.
+  rewrite !mulr0 !mul0r addr0 add0r mulrA [_ / _ * _]mulrA -mulrN opprB.
+  by rewrite [_ * _ * g%:num]mulrAC.
 move=> [p0eq0 [p1eq0 Epeq0]]; split=> //; split=> //.
-by apply: Rminus_diag_uniq; rewrite -Epeq0 /E p1eq0; field.
+apply: subr0_eq; rewrite -Epeq0 /E p1eq0 expr0n /=.
+rewrite !mulr0 !mul0r addr0 add0r [in RHS] mulrA [_ / _ * _ in RHS]mulrA -mulrN.
+by rewrite opprB [_ * _ * g%:num]mulrAC.
 Qed.
 
 Lemma limSKinvar : is_invariant sol (limS sol K).
 Proof.
 move=> p limSKp t tge0.
-exact: (@invariant_limS _ _ _ Kco _ sol0 solP sol_cont Kinvar).
+exact: (@invariant_limS _ _ _ K_compact _ sol0 solP sol_cont Kinvar).
 Qed.
 
 Lemma subset_limSK_K : limS sol K `<=` K.
 Proof.
 move=> p [q Kq solq_top].
-apply: compact_closed (@vect_hausdorff _ 5 Rhausdorff) Kco _ _.
-suff solqK : (sol q @ +oo) K.
-  by move=> A /solq_top - /(_ _ solqK) [r []]; exists r.
-by exists 0 => ? /Rlt_le; apply: Kinvar.
+apply: compact_closed (@hausdorff_normedModType _ _) K_compact _ _.
+have solqK : (sol q @ +oo) K by exists 0 => ? /ltrW; apply: Kinvar.
+by move=> A /solq_top - /(_ _ solqK) [r []]; exists r.
 Qed.
 
 Lemma Vsol'_eq0 p t :
-  limS sol K p -> 0 <= t -> Derive (V \o (sol p)) t = 0.
+  limS sol K p -> 0 <= t -> derive1 (V \o sol p : _ -> R^o) t = 0.
 Proof.
 move=> limSKp tge0; have limSKsolp : limS sol K (sol p t) by apply: limSKinvar.
-have <- : Derive (V \o (sol (sol p t))) 0 = Derive (V \o (sol p)) t.
-  rewrite -[t in RHS]Rplus_0_r.
-  apply: derive_ext_ge0_shift; [apply: Rle_refl|apply: tge0|].
-  move=> ??; rewrite /funcomp -(solD sol0 solP Kinvar) //.
-    by rewrite Rplus_comm.
-  exact: subset_limSK_K.
-apply: (@stable_limS _ _ _ Kco _ sol0 solP sol_cont Kinvar V).
-- by apply/continuous_on_forall => ??; apply: V_continuous.
-- by move=> q s Kq sge0; have := deriv_Vsol Kq sge0; apply: ex_deriv.
-- move=> q Kq; have /is_derive_unique -> := deriv_Vsol Kq (Rle_refl _).
-  apply: Rmult_le_0_r; last exact: pow2_ge_0.
-  by rewrite -Ropp_0; apply/Ropp_le_contravar/Rlt_le.
-- exact: limSKinvar.
+have Kp : K p by apply: subset_limSK_K.
+have -> : derive1 (V \o sol p : _ -> R^o) t =
+  derive1 (V \o sol (sol p t) : _ -> R^o) 0.
+  have dVsolt := is_derive_Vsol Kp tge0; rewrite derive1E derive_val.
+  have Ksolpt : K (sol p t) by apply: subset_limSK_K.
+  have dVsolt' := is_derive_Vsol Ksolpt (lerr _); rewrite derive1E derive_val.
+  by rewrite -(solD sol0 solP Kinvar) // add0r.
+apply: (stable_limS K_compact sol0 solP sol_cont Kinvar (V:=V)) limSKsolp.
+- move=> q Kq; have /(_ q) := V_continuous; apply: flim_trans.
+  exact: flim_app (@flim_within _ _ _ _).
+- by move=> q s Kq sge0; have := is_derive_Vsol Kq sge0.
+- move=> q Kq; have dVsolq := is_derive_Vsol Kq (lerr _).
+  by rewrite derive1E derive_val mulNr oppr_le0 pmulr_rge0 // sqr_ge0.
 Qed.
 
-Lemma sol1_eq0 p t : limS sol K p -> 0 <= t -> (sol p t)[1] = 0.
+Lemma sol1_eq0 p t : limS sol K p -> 0 <= t -> (sol p t)..[1] = 0.
 Proof.
-move=> limSKp tge0; suff : - kd * ((sol p t)[1] ^ 2) = 0.
-  move=> /Rmult_integral; apply: or_ind.
-    move/Ropp_eq_0_compat; rewrite Ropp_involutive => kd0; exfalso.
-    exact: (Rgt_not_eq kd 0).
-  by rewrite /= Rmult_1_r => /Rmult_integral; apply: or_ind.
+move=> limSKp tge0; have Kp : K p by apply: subset_limSK_K.
+have dVsol := is_derive_Vsol Kp tge0; have /eqP := Vsol'_eq0 limSKp tge0.
+rewrite derive1E derive_val mulrI_eq0; last exact/lregN/lregP.
+by rewrite sqrf_eq0 => /eqP.
+Qed.
+
+Lemma is_derive_nneg_eq (f g : R^o -> R^o) (t : R^o) l1 l2 :
+  (forall t, 0 <= t -> f t = g t) -> 0 <= t ->
+  is_derive t 1 f l1 -> is_derive t 1 g l2 -> l1 = l2.
+Proof.
+move=> feg tge0 df dg.
+have /@derive_val <- := df; have /@derive_val <- := dg.
+apply: subr0_eq; rewrite -deriveB // /derive cvg_at_rightE; last first.
+  by rewrite -[cvg _]/(derivable _ _ _).
+apply: flim_map_lim => A A0; rewrite !near_simpl; near=> h.
+  rewrite /= -![(_ - _ : _ -> _) _]/(_ - _) !feg //.
+    by rewrite !subrr scaler0; apply: locally_singleton.
+  by rewrite addr_ge0 // [_%:A]mulr1 ltrW //; near: h.
+by end_near; rewrite /= locally_simpl; exists 1.
+Qed.
+
+Lemma sol1'_eq0 p t : limS sol K p -> 0 <= t -> (Fpendulum (sol p t))..[1] = 0.
+Proof.
+move=> limSKp tge0; have := is_derive_cst (0 : R^o) (t : R^o) 1.
 have /subset_limSK_K Kp := limSKp.
-rewrite -[LHS](is_derive_unique (V \o sol p) t); last exact: deriv_Vsol tge0.
-by rewrite -[RHS](Vsol'_eq0 limSKp tge0).
+have [_ /(_ _ tge0) /(is_derive_component 1)] := sol_is_sol sol0 solP Kp.
+by apply: is_derive_nneg_eq => // s sge0; rewrite sol1_eq0.
 Qed.
 
-Lemma sol1'_eq0 p t : limS sol K p -> 0 <= t -> (Fpendulum (sol p t))[1] = 0.
-Proof.
-move=> limSKp tge0; have /subset_limSK_K Kp := limSKp.
-have [_ /(_ _ tge0)] := sol_is_sol sol0 solP Kp.
-move=> /(deriv_component 1%:R) /is_derive_unique <-.
-by rewrite (derive_ext_ge0 tge0 (fun s sge0 => @sol1_eq0 _ _ limSKp sge0))
-  Derive_const.
-Qed.
-
-Lemma sol0_const p t : limS sol K p -> 0 <= t -> (sol p t)[0] = p[0].
+Lemma sol0_const p t : limS sol K p -> 0 <= t -> (sol p t)..[0] = p..[0].
 Proof.
 move=> limSKp tge0; rewrite -[p in RHS]sol0.
-apply/Logic.eq_sym; case: (Rle_lt_or_eq_dec _ _ tge0) => [|->] //.
-apply: (eq_is_derive (fun s => (sol p s)[0])) => s [sge0 _].
-rewrite -[zero](sol1_eq0 limSKp sge0).
-have /subset_limSK_K Kp := limSKp.
-have [_ /(_ _ sge0) /(deriv_component (0%:R))] := sol_is_sol sol0 solP Kp.
-by rewrite !mxE.
+apply (@eq0_derive1_cst (fun s => (sol p s)..[0]) 0 t); last first.
+  by rewrite inE lerr tge0.
+move=> s /andP [sge0 _]; have /subset_limSK_K Kp := limSKp.
+have [_ /(_ _ sge0) /(is_derive_component 0) dsol0] := sol_is_sol sol0 solP Kp.
+by apply: DeriveDef => //; rewrite derive_val mxE /= sol1_eq0.
 Qed.
 
 Lemma Esol_const p t : limS sol K p -> 0 <= t -> (E \o sol p) t = E p.
 Proof.
 move=> limSKp tge0; rewrite -[p in RHS]sol0.
-apply/Logic.eq_sym; case: (Rle_lt_or_eq_dec _ _ tge0) => [|->] //.
-apply: (eq_is_derive (E \o sol p)) => s [sge0 _].
-have -> : zero = (sol p s)[1] * (fctrl (sol p s)).
-  by rewrite sol1_eq0 ?Rmult_0_l.
-by apply: deriv_Esol sge0; apply: subset_limSK_K.
+apply (@eq0_derive1_cst (E \o sol p) 0 t); last first.
+  by rewrite inE lerr tge0.
+move=> s /andP [sge0 _]; have /subset_limSK_K Kp := limSKp.
+have dEsol := is_derive_Esol Kp sge0; apply: DeriveDef => //.
+by rewrite derive_val sol1_eq0 // mul0r.
 Qed.
 
 Lemma Efctrl_psol0_eq0 p t : limS sol K p -> 0 <= t ->
-  ke * (E (sol p t)) * (fctrl (sol p t)) + kx * (sol p t)[0] = 0.
+  ke%:num * (E (sol p t)) * (fctrl (sol p t)) + kx%:num * (sol p t)..[0] = 0.
 Proof.
 move=> limSKp tge0.
-have -> : 0 = - (kd * (sol p t)[1] + kv * (Fpendulum (sol p t))[1]).
-  by rewrite sol1_eq0 ?sol1'_eq0 ?Rmult_0_r ?Rplus_0_r ?Ropp_0.
-rewrite /Fpendulum !mxE /= /fctrl; field.
-split; last by rewrite -{2}[(sol p t)[3]]Rmult_1_r;
-  apply/not_eq_sym/Rlt_not_eq/Mp_ms_gt0.
-have [circsolt Vsolts] : K (sol p t).
+have -> :
+  0 = - (kd%:num * (sol p t)..[1] + kv%:num * (Fpendulum (sol p t))..[1]).
+  by rewrite sol1'_eq0 // sol1_eq0 // !mulr0 add0r oppr0.
+have [circsolt /ler_lt_trans /(_ k0_valid) Vsolts] : K (sol p t).
   by apply: Kinvar tge0; apply: subset_limSK_K.
-by apply: fctrl_wdef circsolt _; apply: Rle_lt_trans k0_valid.
+have fctrl_def := fctrl_wdef circsolt Vsolts.
+have Mpmsne0 : M%:num + m%:num * (sol p t)..[3] ^+ 2 != 0.
+  by rewrite lt0r_neq0 // Mp_ms_gt0.
+rewrite /Fpendulum !mxE /= /fctrl addl_eq mulrA divr_eq //.
+rewrite [LHS]mulrDl addl_eq opprD [LHS]mulrDl addrC addl_eq mulrC -mulNr.
+rewrite mulrA mulrA divr_eq //; apply/Logic.eq_sym.
+rewrite mulrDr [LHS]mulrDr addrC addl_eq [LHS]mulrA [LHS]mulrA divr_eq //.
+ssring.
 Qed.
 
-Lemma Rinv_elim x y z : y <> 0 -> x / y = z <-> z * y = x.
-Proof. by move=> yne0; split=> <-; field. Qed.
-
 Lemma div_fctrl_mP p t : limS sol K p -> 0 <= t ->
-  (sol p t)[3] * (g * (sol p t)[2] - l * ((sol p t)[4] ^ 2)) =
-  (fctrl (sol p t)) / m.
+  (sol p t)..[3] * (g%:num * (sol p t)..[2] - l%:num * (sol p t)..[4] ^+ 2) =
+  (fctrl (sol p t)) / m%:num.
 Proof.
-move=> limSKp tge0; apply/Logic.eq_sym/Rinv_elim; first exact: Rgt_not_eq.
+move=> limSKp tge0; apply/Logic.eq_sym; rewrite divr_eq //; apply: subr0_eq.
 have := sol1'_eq0 limSKp tge0; rewrite !mxE /=.
-have Mp_ms_n0 : (M + m * ((sol p t)[3] ^ 2)) <> 0 by apply/Rgt_not_eq/Mp_ms_gt0.
-move=> /Rinv_elim - /(_ Mp_ms_n0); rewrite Rmult_0_l.
-by move=> /(@Logic.eq_sym _ 0) /Rplus_opp_r_uniq ->; ring.
+rewrite divr_eq; last exact/lt0r_neq0/Mp_ms_gt0.
+rewrite mul0r => fctrl_val.
+by rewrite mulrC mulrA -[in X in X - _]opprB mulrN -opprD -fctrl_val oppr0.
 Qed.
 
 Lemma Fpendulum4E p t : limS sol K p -> 0 <= t ->
-  (Fpendulum (sol p t))[4] = (g / l) * (sol p t)[3].
+  (Fpendulum (sol p t))..[4] = g%:num / l%:num * (sol p t)..[3].
 Proof.
 move=> limSKp tge0; rewrite !mxE /=.
 have divfm_val := div_fctrl_mP limSKp tge0.
-have /Rinv_elim := Logic.eq_sym divfm_val.
-move<-; last exact/Rgt_not_eq.
-field_simplify_eq.
-  suff -> : (sol p t)[2] ^ 2 = 1 - ((sol p t)[3] ^ 2) by ring.
-  suff [<- _] : K (sol p t) by ring.
-  exact/subset_limSK_K/limSKinvar.
-do 2 ?[split; first exact: Rgt_not_eq].
-by rewrite -[X in _ [3] * X]Rmult_1_r; apply/Rgt_not_eq/Mp_ms_gt0.
+have := Logic.eq_sym divfm_val; rewrite divr_eq // =><-.
+rewrite divr_eq; last by apply: lt0r_neq0; rewrite pmulr_rgt0 // Mp_ms_gt0.
+rewrite mulrCA mulrA mulrA [l%:num * _ in LHS]mulrC mulrVK ?unitfE //.
+have [] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
+by rewrite addrC addl_eq => -> _; ssring.
 Qed.
 
 Lemma En0_fctrlsol_const p t :
-  limS sol K p -> E p <> 0 -> 0 <= t -> fctrl (sol p t) = fctrl p.
+  limS sol K p -> E p != 0 -> 0 <= t -> fctrl (sol p t) = fctrl p.
 Proof.
 move=> limSKp Epn0 tge0.
 have := Efctrl_psol0_eq0 limSKp tge0.
-rewrite -(Efctrl_psol0_eq0 limSKp (Rle_refl _)) sol0
+rewrite -(Efctrl_psol0_eq0 limSKp (lerr _)) sol0
   [E (sol p t)](Esol_const limSKp tge0) (sol0_const limSKp tge0).
-move=> /Rplus_eq_reg_r /Rmult_eq_reg_l; apply.
-by apply: Rmult_integral_contrapositive_currified Epn0; apply/Rgt_not_eq.
+have keEn0 : ke%:num * E p != 0 by rewrite mulrI_eq0 //; apply/lregP.
+by rewrite addl_eq -addrA subrr addr0 mulrC -divr_eq // mulrAC -mulrA mulVKf.
 Qed.
 
-Lemma is_derive_nneg_unique (f : R -> R) t l1 l2 :
-  0 <= t -> filterdiff f (within (Rle 0) (locally t)) (scal^~ l1) ->
-  filterdiff f (within (Rle 0) (locally t)) (scal^~ l2) -> l1 = l2.
+Lemma inf_in_finset (A : {fset R}) :
+  has_inf [pred t | t \in A] -> inf [pred t | t \in A] \in A.
 Proof.
-move=> tge0 [_ f'tl1] [_ f'tl2].
-have tt : is_filter_lim (within (Rle 0) (locally t)) t.
-  by move=> A [e te_A]; exists e => ? /te_A.
-have /f'tl1 {f'tl1} f'tl1 := tt; have /f'tl2 {f'tl2} f'tl2 := tt.
-apply: Req_le_aux => e.
-have [e1 te1f'] := f'tl1 (mkposreal _ (is_pos_div_2 e)).
-have [e2 te2f'] := f'tl2 (mkposreal _ (is_pos_div_2 e)).
-set s := t + (Rmin e1 e2) / 2.
-have hmine12_ge0 : 0 <= (Rmin e1 e2) / 2.
-  apply/Rle_div_r; first exact: Rlt_0_2.
-  by rewrite Rmult_0_l; apply/Rlt_le/Rmin_pos.
-have sge0 : 0 <= s by apply: Rplus_le_le_0_compat tge0 _.
-have smt_val : s - t = (Rmin e1 e2) / 2 by rewrite /s; ring.
-have : ball t e1 s.
-  apply: Rabs_def1; rewrite [minus _ _]smt_val.
-    apply/Rlt_div_l; first exact: Rlt_0_2.
-    by apply: Rle_lt_trans (Rmin_l _ _) _; have := cond_pos e1; lra.
-  by apply: Rlt_le_trans hmine12_ge0; have := cond_pos e1; lra.
-move=> /te1f' /(_ sge0) /= hl1.
-have : ball t e2 s.
-  apply: Rabs_def1; rewrite [minus _ _]smt_val.
-    apply/Rlt_div_l; first exact: Rlt_0_2.
-    by apply: Rle_lt_trans (Rmin_r _ _) _; have := cond_pos e2; lra.
-  by apply: Rlt_le_trans hmine12_ge0; have := cond_pos e2; lra.
-move=> /te2f' /(_ sge0) /= hl2.
-have -> : l1 - l2 =
-  ((((f s) - (f t)) / (s - t)) - l2) - ((((f s) - (f t)) / (s - t)) - l1).
-  by ring.
-have smt_gt0 : 0 < norm (s - t).
-  rewrite smt_val; apply: Rabs_pos_lt.
-  apply/Rgt_not_eq/Rlt_div_r; first exact: Rlt_0_2.
-  by rewrite Rmult_0_l; apply: Rmin_pos.
-apply: Rle_trans (Rabs_triang _ _) _.
-rewrite [_ e]double_var; apply: Rplus_le_compat.
-  move: hl2 => /(Rle_div_l _ _ _ smt_gt0).
-  rewrite -Rabs_div; last first.
-    by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
-  rewrite [(minus _ _) / _]RIneq.Rdiv_minus_distr
-    [(scal _ _) / _]Rinv_r_simpl_m => //.
-  by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
-move: hl1 => /(Rle_div_l _ _ _ smt_gt0).
-rewrite Rabs_Ropp -Rabs_div; last first.
-  by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
-rewrite [(minus _ _) / _]RIneq.Rdiv_minus_distr
-  [(scal _ _) / _]Rinv_r_simpl_m => //.
-by apply/Rgt_not_eq; move: smt_gt0; rewrite [norm _]Rabs_pos_eq // smt_val.
+move=> infA; have /has_infP [[t At] _] := infA.
+have Amin : \big[minr/t]_(s <- enum_fset A) s \in A.
+  have : forall s, s \in enum_fset A -> s \in A by [].
+  elim: (enum_fset A) => [inA|s l ihl inA]; first by rewrite big_nil.
+  rewrite big_cons; case: minrP => _; first by apply: inA; rewrite inE eq_refl.
+  by apply: ihl => r lr; apply: inA; rewrite inE orbC lr.
+suff -> : inf [pred t | t \in A] = \big[minr/t]_(s <- enum_fset A) s by [].
+apply/eqP; rewrite eqr_le; apply/andP; split; first exact: inf_lower_bound Amin.
+apply: lb_le_inf; first by have /has_infP [] := infA.
+apply/lbP => s As; have : s \in enum_fset A by [].
+elim: (enum_fset A) => // r l ihl; rewrite inE => /orP [/eqP <-|].
+  by rewrite big_cons ler_minl lerr.
+by rewrite big_cons ler_minl orbC => /ihl ->.
 Qed.
 
-Lemma derive_nneg_eq (f g : R -> R) t l1 l2 :
-  (forall t, 0 <= t -> f t = g t) -> 0 <= t ->
-  is_derive f t l1 -> is_derive g t l2 -> l1 = l2.
-Proof.
-move=> feqg tge0 f'l1 g'l2.
-have withinRploct_proper : ProperFilter (within (Rle 0) (locally t)).
-  by apply: within_locally_proper => ? /locally_singleton; exists t.
-have limt : is_filter_lim (within (Rle 0) (locally t)) t.
-  by move=> A [e se_A]; exists e => ? /se_A.
-apply: (@is_derive_nneg_unique f t _ _ tge0).
-  exact: filterdiff_locally f'l1.
-apply: (filterdiff_ext_loc g).
-- by exists (mkposreal _ Rlt_0_1) => ???; rewrite feqg.
-- move=> s seqt; rewrite feqg //; suff -> : s = t by [].
-  have withinRploct_proper' : ProperFilter' (within (Rle 0) (locally t)).
-    exact: Proper_StrongProper.
-  exact: is_filter_lim_unique seqt _.
-- exact: filterdiff_locally g'l2.
-Qed.
-
-Lemma cont_is_lim (f : R -> R) x : continuous f x <-> is_lim f x (f x).
-Proof.
-apply: iff_trans (continuity_pt_filterlim' _ _); apply: iff_sym.
-exact: iff_trans (continuity_pt_filterlim _ _) _.
-Qed.
-
-Lemma bigRmin_inseq (s : seq R) x :
-  List.In x s -> List.In (\big[Rmin/x]_(y <- s) y) s.
-Proof.
-elim: s => // y s ihs; apply: or_ind; last first.
-  move=> /ihs smin; rewrite big_cons.
-  by apply: (Rmin_case _ _ (List.In (A:=R)^~ _)); [left|right].
-move=> {ihs y} ->; rewrite big_cons.
-elim: s => [|y s ihs].
-  by rewrite big_nil Rmin_left; [left|apply: Rle_refl].
-rewrite big_cons Rmin_assoc [X in Rmin X _]Rmin_comm -Rmin_assoc.
-apply: (Rmin_case _ _ (List.In (A:=R)^~ _)); first by right; left.
-by apply: or_ind ihs => [<-|ihs]; [left|right;right].
-Qed.
-
-Lemma bigRmin_extract (s : seq R) x y :
-  List.In y s -> \big[Rmin/x]_(z <- s) z = Rmin y (\big[Rmin/x]_(z <- s) z).
-Proof.
-elim: s => // z s ihs; rewrite !big_cons; apply: or_ind => [<-|sy].
-  by rewrite Rmin_assoc (Rmin_left _ _ (Rle_refl _)).
-by rewrite Rmin_assoc [Rmin y z]Rmin_comm -Rmin_assoc -ihs.
-Qed.
-
-Lemma glb_finset (A : set R) x l :
-  finite_set A -> A x -> is_glb_Rbar A l -> A l.
-Proof.
-move=> [s Aes] /Aes sx glbl; apply/Aes.
-suff [? [? ->]] : exists y, List.In y s /\ l = y by [].
-apply: NNPP => /not_ex_all_not nsl.
-have smin : List.In (\big[Rmin/x]_(y <- s) y) s by apply/bigRmin_inseq.
-have llemin : Rbar_le l (\big[Rmin/x]_(y <- s) y) by apply/(proj1 glbl)/Aes.
-apply: (nsl (\big[Rmin/x]_(y <- s) y)); split => //.
-apply: Rbar_le_antisym llemin _.
-apply: (proj2 glbl) => y /Aes sy; rewrite (bigRmin_extract _ sy).
-exact: Rmin_l.
-Qed.
-
-Lemma cont_finimage_const (f : R -> R) n (g : 'I_n -> R) :
-  (forall t, 0 <= t -> continuous f t) ->
+Lemma continuous_finimage_cst (f : R -> R) n (g : 'I_n -> R) :
+  {in (>= 0), continuous f} ->
   (forall t, 0 <= t -> exists i, f t = g i) ->
   forall t, 0 <= t -> f t = f 0.
 Proof.
 case: n g => [g ? finim_f t tge0|]; first by have /finim_f [] := tge0; case.
 case=> [|n] g fcont finim_f t tge0.
-  have /finim_f [i ->] := tge0; have /finim_f [j ->] := Rle_refl 0.
+  have /finim_f [i ->] := tge0; have /finim_f [j ->] := lerr (0 : R).
   by rewrite !ord1.
-case: (Req_dec (f t) (f 0)) => // ft_ne_f0; exfalso.
-case/Rle_lt_or_eq_dec: tge0 => [tgt0|t0]; last by apply: ft_ne_f0; rewrite t0.
-case/Rdichotomy: ft_ne_f0 => [ft_lt_f0|/Rgt_lt f0_lt_ft].
-  have gtft_img_f0 : ((Rlt (f t)) `&` (g @` setT)) (f 0).
-    by split=> //; have /finim_f [i] := Rle_refl 0; exists i.
-  have /lb_finglb : (Rlt (f t)) `&` (g @` setT) !=set0 by exists (f 0).
-  case=> [|l glbl]; first by exists (f t) => ? [].
-  set y := ((f t) + l) / 2.
-  have [ftltl _] : ((Rlt (f t)) `&` (g @` setT)) l.
-    apply: glb_finset gtft_img_f0 glbl.
-    apply: sub_finite_set (@subsetIr _ _ _) _.
-    exists (List.map g (index_enum (ordinal_finType n.+2))) => x.
-    split=> [[i _ <-]|].
-      apply/List.in_map_iff; exists i; split=> //.
-      exact/Iter.In_mem/mem_index_enum.
-    elim: (index_enum (ordinal_finType n.+2))=> // i s ihs.
-    by apply: or_ind; [move<-; exists i|move=> /ihs].
-  case: (IVT_Rbar_decr f 0 t (f 0) (f t) y).
-  - exact/cont_is_lim/fcont/Rle_refl.
-  - exact/cont_is_lim/fcont/Rlt_le.
-  - by move=> x /Rlt_le xge0 _; apply/continuity_pt_filterlim/fcont.
-  - by [].
-  - split=> //; rewrite /y /=; first by lra.
-    suff : l <= f 0 by lra.
-    apply: (proj1 glbl); split=> //; have /finim_f [i ?] := Rle_refl 0.
-    by exists i.
-  - move=> x [/Rlt_le xge0 [xltt fxey]].
-    have /finim_f [i] := xge0; rewrite fxey => yegi.
-    have : Rbar_le l y.
-      by apply: (proj1 glbl); split; [rewrite /y; lra|exists i].
-    by apply: Rlt_not_le; rewrite /y; lra.
-have gtf0_img_ft : ((Rlt (f 0)) `&` (g @` setT)) (f t).
-  by split=> //; have /Rlt_le /finim_f [i] := tgt0; exists i.
-have /lb_finglb : (Rlt (f 0)) `&` (g @` setT) !=set0 by exists (f t).
-case=> [|l glbl]; first by exists (f 0) => ? [].
-set y := ((f 0) + l) / 2.
-have [f0ltl _] : ((Rlt (f 0)) `&` (g @` setT)) l.
-  apply: glb_finset gtf0_img_ft glbl.
-  apply: sub_finite_set (@subsetIr _ _ _) _.
-  exists (List.map g (index_enum (ordinal_finType n.+2))) => x.
-  split=> [[i _ <-]|].
-    apply/List.in_map_iff; exists i; split=> //.
-    exact/Iter.In_mem/mem_index_enum.
-  elim: (index_enum (ordinal_finType n.+2))=> // i s ihs.
-  by apply: or_ind; [move<-; exists i|move=> /ihs].
-case: (IVT_Rbar_incr f 0 t (f 0) (f t) y).
-- exact/cont_is_lim/fcont/Rle_refl.
-- exact/cont_is_lim/fcont/Rlt_le.
-- by move=> x /Rlt_le xge0 _; apply/continuity_pt_filterlim/fcont.
-- by [].
-- split=> //; rewrite /y /=; first by lra.
-  suff : l <= f t by lra.
-  apply: (proj1 glbl); split=> //; have /Rlt_le /finim_f [i ?] := tgt0.
-  by exists i.
-- move=> x [/Rlt_le xge0 [xltt fxey]].
-  have /finim_f [i] := xge0; rewrite fxey => yegi.
-  have : Rbar_le l y.
-    by apply: (proj1 glbl); split; [rewrite /y; lra|exists i].
-  by apply: Rlt_not_le; rewrite /y; lra.
+case: (eqVneq (f t) (f 0)) => // ftnef0.
+set fl := minr (f 0) (f t); set fr := maxr (f 0) (f t).
+have ltflr : fl < fr.
+  rewrite /fr; case: maxrP => [left0|ltf0t].
+    by rewrite /fl minr_r // ltr_def eq_sym ftnef0 left0.
+  by rewrite /fl minr_l // ltrW.
+set img := [pred x | (fl < x) && (x \in g @` setT)].
+have imgfr : (g @` setT) fr.
+  rewrite /fr; case: maxrP => _.
+    by have /finim_f [i] := lerr (0 : R); exists i.
+  by have /finim_f [i] := tge0; exists i.
+have imgn0 : reals.nonempty img.
+  by exists fr; rewrite !inE ltflr andTb; apply/asboolP.
+have infimg : has_inf img.
+  by apply/has_infP; split=> //; exists fl; apply/lbP => ? /andP [/ltrW].
+have [] := @IVT f _ _ ((fl + inf img) / 2) tge0.
+    by move=> s s0t; apply: fcont; rewrite [_ \in _](itvP s0t).
+  apply/andP; split.
+    rewrite ler_pdivl_mulr // mulrC -addrxx ler_add2l.
+    by apply: lb_le_inf imgn0 _; apply/lbP => ? /andP [/ltrW].
+  rewrite ler_pdivr_mulr // mulrC -addrxx ler_add //; first exact: ltrW.
+  by apply: inf_lower_bound infimg _ _; apply/andP; split=> //; apply/asboolP.
+move=> s s0t fsemid; suff ltfl_inf : fl < inf img.
+  have : inf img <= (fl + inf img) / 2.
+    apply: inf_lower_bound (infimg) _ _; apply/andP; split; last first.
+      have /finim_f [i] : 0 <= s by rewrite (itvP s0t).
+      by rewrite fsemid => midegi; apply/asboolP; exists i.
+    by rewrite ltr_pdivl_mulr // mulrC -addrxx ltr_add2l.
+  by rewrite ler_pdivl_mulr // mulrC -addrxx ler_add2r lerNgt ltfl_inf.
+have imgE : img = pred_of_finset
+  (seq_fset [seq t <- [seq g i | i : 'I_n.+2] | fl < t]) :> pred R.
+  rewrite funeqE => x; rewrite /img /= /pred_of_finset seq_fsetE .
+  apply: (@sameP ((fl < x) /\ x \in (g @` setT))); first exact: andP.
+  apply: (iffP idP) => [|[ltflx /asboolP [i _ giex]]].
+    rewrite mem_filter => /andP [ltflx /mapP [i _ xegi]]; split=> //.
+    by apply/asboolP; exists i.
+  rewrite mem_filter ltflx andTb; apply/mapP; exists i => //.
+  by rewrite enumT.
+rewrite imgE; set A := seq_fset _.
+have : inf (pred_of_finset A) \in A.
+  by apply: inf_in_finset; rewrite -[X in has_inf X]imgE.
+by rewrite /A seq_fsetE mem_filter => /andP [].
 Qed.
 
-Lemma poly2_factor a b c x :
-  a <> 0 -> a * (x ^ 2) + b * x + c = 0 ->
-  x = (- b + sqrt ((b ^ 2) - 4 * a * c)) / (2 * a) \/
-  x = (- b - sqrt ((b ^ 2) - 4 * a * c)) / (2 * a).
+Lemma poly2_factor (a b c x : R) :
+  a != 0 -> a * (x ^+ 2) + b * x + c = 0 ->
+  x = (- b + Num.sqrt (b ^+ 2 - 4%:R * a * c)) / (2 * a) \/
+  x = (- b - Num.sqrt (b ^+ 2 - 4%:R * a * c)) / (2 * a).
 Proof.
 move=> ane0 xroot.
-set dlt := (b ^ 2) - 4 * a * c.
-set x1 := (- b + sqrt dlt) / (2 * a).
-set x2 := (- b - sqrt dlt) / (2 * a).
-suff poly_fact : a * (x ^ 2) + b * x + c = a * (x - x1) * (x - x2).
-  move: xroot; rewrite poly_fact.
-  case/Rmult_integral; last by move/Rminus_diag_uniq; right.
-  by case/Rmult_integral=> //; move/Rminus_diag_uniq; left.
-rewrite /x1 /x2; case: (Rle_or_lt 0 dlt) => [dltge0|dltlt0].
-  field_simplify_eq => //=; rewrite [in sqrt _ * _]Rmult_1_r sqrt_sqrt // /dlt.
-  by ring.
-exfalso; move: xroot.
-have -> : a * (x ^ 2) + b * x + c =
-  a * ((x + b / (2 * a)) ^ 2) + (c - (b ^ 2) / (4 * a)).
-  by field.
-have := ane0; case/Rdichotomy => [alt0|/Rgt_lt agt0]; last first.
-  apply: tech_Rplus; first by apply: Rmult_le_pos (pow2_ge_0 _); apply: Rlt_le.
-  by apply/Rlt_Rminus/Rlt_div_l; [|move: dltlt0; rewrite /dlt]; lra.
-move/Ropp_eq_0_compat; rewrite Ropp_plus_distr; apply: tech_Rplus.
-  apply/Ropp_0_ge_le_contravar/Rle_ge/Rmult_le_0_r; first exact: Rlt_le.
-  exact: pow2_ge_0.
-rewrite Ropp_plus_distr.
-have -> : - ((b ^ 2) / (4 * a)) = (b ^ 2) / (- 4 * a) by field.
-by apply/Rlt_Rminus/Rlt_div_l; [|move: dltlt0; rewrite /dlt]; lra.
+set dlt := b ^+ 2 - 4%:R * a * c.
+set x1 := (- b + Num.sqrt dlt) / (2 * a).
+set x2 := (- b - Num.sqrt dlt) / (2 * a).
+suff poly_fact : a * (x ^+ 2) + b * x + c = a * (x - x1) * (x - x2).
+  move: xroot; rewrite poly_fact => /eqP; rewrite mulf_eq0 => /orP [].
+    by rewrite mulrI_eq0; [rewrite subr_eq0 => /eqP->; left|apply/lregP].
+  by rewrite subr_eq0 => /eqP->; right.
+rewrite /x1 /x2; case: (lerP 0 dlt) => [dltge0|dltlt0].
+  rewrite -mulrA mulrBr mulrBl mulrBl opprB addrA [(x * x + _) + _]addrAC.
+  rewrite [_ / _ * x]mulrC -[in RHS]addrA -opprD -mulrDr -mulrDl.
+  rewrite addrCA -[- b + _ - _]addrA subrr addr0 addrxx.
+  rewrite invrM ?unitfE // [2 * _ * _]mulrC !mulrA mulrVK ?unitfE //.
+  rewrite addrAC mulrN opprK !mulrDr mulrA [a * (x / _ * _)]mulrCA !mulrA.
+  rewrite mulrVK ?unitfE // [b * _]mulrC; congr (_ + _ + _).
+  rewrite [a * _]mulrC -[_ * a * _]mulrA mulfV // mulr1.
+  rewrite ![_ * - _]mulrC !mulrA !mulrDr -!mulrDl !mulrN !mulNr !opprK.
+  rewrite [_ * Num.sqrt _]mulrC -addrA addKr -!expr2 sqr_sqrtr // /dlt.
+  rewrite opprD addrA subrr opprK add0r -mulrA -invrM ?unitfE //.
+  rewrite mulrC !mulrA -mulrA -mulrA [a * _]mulrC mulrVK ?unitfE //.
+  by rewrite -natrM -mulrA mulrCA mulVKr // unitfE.
+move: xroot; have -> : a * (x ^+ 2) + b * x + c =
+  a * ((x + b / (2 * a)) ^+ 2) + (c - b ^+ 2 / (4%:R * a)).
+  rewrite [in RHS]expr2 -mulrA mulrDr mulrDl [c - _]addrC addrA !mulrDr.
+  rewrite -[_ - _]addrA -[a * _ + _ + _ in RHS]addrA; congr (_ + _ + _).
+  rewrite addrA [(x + _) * _]mulrDl mulrDr addrA -mulrDr [x * _]mulrC -mulrDl.
+  rewrite -[LHS]addr0 -addrA; congr (_ + _).
+    rewrite mulrA; congr (_ * _); rewrite -mulrDl invrM ?unitfE //.
+    rewrite mulrC -mulrA [_ * a]mulrC mulVKr ?unitfE // mulrDl.
+    exact: splitr.
+  rewrite !mulrA [a * _]mulrC -[b * a / _]mulrA invrM ?unitfE //.
+  rewrite mulVKr ?unitfE // [b / _ * _]mulrAC -[_ / 2 * _]mulrA -mulrBr.
+  rewrite [_^-1 * _]mulrCA invrM ?unitfE // -mulrBr -invrM ?unitfE //.
+  by rewrite -natrM subrr !mulr0.
+suff : a * (x + b / (2 * a)) ^+ 2 + (c - b ^+ 2 / (4%:R * a)) != 0.
+  by move=> pn0 p0; move: pn0; rewrite p0 eq_refl.
+have := ane0; rewrite neqr_lt => /orP [alt0|agt0]; last first.
+  apply:lt0r_neq0; rewrite ltr_paddl //; first by rewrite pmulr_rge0 // sqr_ge0.
+  rewrite subr_gt0 ltr_pdivr_mulr; last by rewrite pmulr_rgt0.
+  by rewrite mulrC -subr_lt0.
+rewrite -oppr_eq0 opprD; apply: lt0r_neq0; rewrite ltr_paddl //.
+  by rewrite oppr_ge0 nmulr_rle0 // sqr_ge0.
+rewrite oppr_gt0 subr_lt0 ltr_ndivl_mulr; last by rewrite mulrC nmulr_rlt0.
+by rewrite mulrC -subr_lt0.
 Qed.
 
 Lemma En0_sol2_const p :
-  limS sol K p -> E p <> 0 -> forall t, 0 <= t -> (sol p t)[2] = p[2].
+  limS sol K p -> E p != 0 -> forall t, 0 <= t -> (sol p t)..[2] = p..[2].
 Proof.
 move=> limSKp Epn0 t tge0.
 have Kp : K p by apply: subset_limSK_K.
-set C1 := - (2 * g + ((2 * (E p))/ (m * l))); set C2 := (fctrl p) / m.
+set C1 := - (2 * g%:num + 2 * (E p) / (m%:num * l%:num)).
+set C2 := fctrl p / m%:num.
 have sol32_val : forall s, 0 <= s ->
-  (sol p s)[3] * (3 * g * (sol p s)[2] + C1) = C2.
+  (sol p s)..[3] * (3%:R * g%:num * (sol p s)..[2] + C1) = C2.
   move=> s sge0.
   rewrite /C1 /C2 -(Esol_const limSKp sge0) /E /= (sol1_eq0 limSKp sge0)
     -(En0_fctrlsol_const limSKp Epn0 sge0) -(div_fctrl_mP limSKp sge0).
-  by field; split; apply: Rgt_not_eq.
+  rewrite expr0n /= !mulr0 !mul0r add0r addr0 mulrDr mulrA [1 / _]mulrC.
+  rewrite mulVKr ?unitfE // mul1r mulrBr addrC addl_eq -mulNr mulrDr.
+  by rewrite addrC addl_eq mulrA divr_eq //; ssring.
 have sol423_val s : 0 <= s ->
-  (sol p s)[4] * (3 * g * (((sol p s)[2] ^ 2) - ((sol p s)[3] ^ 2)) +
-    C1 * (sol p s)[2]) = 0.
-  move=> sge0; apply: (derive_nneg_eq sol32_val sge0); last first.
-    exact: is_derive_const.
-  have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: deriv_eq.
-  by rewrite !mxE /zero /minus /plus /opp /=; ring.
+  (sol p s)..[4] * (3%:R * g%:num * ((sol p s)..[2] ^+ 2 -
+  (sol p s)..[3] ^+ 2) + C1 * (sol p s)..[2]) = 0.
+  move=> sge0; apply (is_derive_nneg_eq sol32_val sge0); last first.
+    exact: is_derive_cst.
+  have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: is_derive_eq.
+  by rewrite !mxE /=; ssring.
 have sol432_val' s : 0 <= s ->
-  (sol p s)[3] * ((g / l) * (3 * g * (((sol p s)[2] ^ 2) -
-    ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2]) -
-    ((sol p s)[4] ^ 2) * (12 * g * (sol p s)[2] + C1)) = 0.
-  move=> sge0; apply: (derive_nneg_eq sol423_val sge0); last first.
-    exact: is_derive_const.
-  have [_/(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: deriv_eq.
-  rewrite Fpendulum4E // !mxE /zero /minus /plus /opp /=; field.
-  exact: Rgt_not_eq.
-set x1 := (- C1 + sqrt ((C1 ^ 2) - 4 * (6 * g) * (- 3 * g))) / (2 * (6 * g)).
-set x2 := (- C1 - sqrt ((C1 ^ 2) - 4 * (6 * g) * (- 3 * g))) / (2 * (6 * g)).
-set f := fun i : 'I_4 => if i == ord0 then - 1 else
-                           if i == 1%:R then 1 else
-                             if i == 2%:R then x1 else x2.
+  (sol p s)..[3] * (g%:num / l%:num * (3%:R * g%:num * ((sol p s)..[2] ^+ 2 -
+    (sol p s)..[3] ^+ 2) + C1 * (sol p s)..[2]) -
+    (sol p s)..[4] ^+ 2 * (12%:R * g%:num * (sol p s)..[2] + C1)) = 0.
+  move=> sge0; apply (is_derive_nneg_eq sol423_val sge0); last first.
+    exact: is_derive_cst.
+  have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: is_derive_eq.
+  rewrite Fpendulum4E // !mxE /= addrC addl_eq -![_ *: _]/(_ * _).
+  rewrite mulrA mulrAC mulrA divr_eq // mulrDl addl_eq.
+  rewrite [(sol p s)..[3] * _]mulrDr mulrDl addl_eq [_ / _ * _]mulrC mulrA.
+  by rewrite mulrA mulrVK ?unitfE //; ssring.
+set x1 := (- C1 + Num.sqrt (C1 ^+ 2 - 4%:R * (6%:R * g%:num) *
+  (- 3%:R * g%:num))) / (2 * (6%:R * g%:num)).
+set x2 := (- C1 - Num.sqrt (C1 ^+ 2 - 4%:R * (6%:R * g%:num) *
+  (- 3%:R * g%:num))) / (2 * (6%:R * g%:num)).
+set f := fun i : 'I_4 => if i == 0 then - 1 else
+                           if i == 1 then 1 else
+                             if i == 2 then x1 else x2.
 rewrite -[p in RHS]sol0.
-apply: (@cont_finimage_const (fun s => (sol p s)[2]) _ f) tge0.
-  move=> s sge0; apply: ex_derive_continuous.
-  by have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: ex_deriv.
+apply: (@continuous_finimage_cst (fun s => (sol p s)..[2]) _ f) tge0.
+  move=> s sge0; apply: (@differentiable_continuous [normedModType R of R^o]
+    [normedModType R of R^o]).
+  have [_ /(_ _ sge0) sol_ats]:= sol_is_sol sol0 solP Kp.
+  exact/derivable1_diffP.
 move=> s sge0.
-have circsol : ((sol p s)[2] ^ 2) + ((sol p s)[3] ^ 2) = 1.
+have circsol : (sol p s)..[2] ^+ 2 + (sol p s)..[3] ^+ 2 = 1.
   suff [] : K (sol p s) by [].
   exact/subset_limSK_K/limSKinvar.
 have solroot_imf :
-  3 * g * (((sol p s)[2] ^ 2) - ((sol p s)[3] ^ 2)) + C1 * (sol p s)[2] = 0 ->
-  exists i, (sol p s)[2] = f i.
-  have -> : (sol p s)[3] ^ 2 = 1 - ((sol p s)[2] ^ 2) by rewrite -circsol; ring.
+  3%:R * g%:num * ((sol p s)..[2] ^+ 2 - (sol p s)..[3] ^+ 2) +
+  C1 * (sol p s)..[2] = 0 -> exists i, (sol p s)..[2] = f i.
+  have -> : (sol p s)..[3] ^+ 2 = 1 - (sol p s)..[2] ^+ 2.
+    by rewrite -circsol [X in X - _]addrC addrK.
   move=> sol2_val.
   have sol2_root :
-    6 * g * ((sol p s)[2] ^ 2) + C1 * (sol p s)[2] + (- 3 * g) = 0.
-    by rewrite -sol2_val; ring.
-  case/poly2_factor: sol2_root => {sol2_val} [|sol2_val|sol2_val].
-  - by apply: Rmult_integral_contrapositive_currified; [|have := cond_pos g];
-    lra.
-  - by exists (2%:R); rewrite sol2_val.
-  - by exists (3%:R); rewrite sol2_val.
-case: (Req_dec ((sol p s)[4]) 0) => [sol4e0|sol4ne0]; last first.
-  by have /sol423_val /Rmult_integral := sge0; apply: or_ind.
+    6%:R * g%:num * ((sol p s)..[2] ^+ 2) + C1 * (sol p s)..[2] +
+    (- 3%:R * g%:num) = 0.
+    by rewrite -sol2_val; ssring.
+  case/poly2_factor: sol2_root => {sol2_val} [|sol2_val|sol2_val] //.
+    by exists (2%:R); rewrite sol2_val.
+  by exists (3%:R); rewrite sol2_val.
+case: (eqVneq ((sol p s)..[4]) 0) => [sol4e0|sol4ne0]; last first.
+  by have /sol423_val/eqP := sge0; rewrite mulrI_eq0 => [/eqP|]//; apply/lregP.
 have /sol432_val' := sge0.
-rewrite sol4e0 [0 ^ 2]Rmult_0_l Rmult_0_l Rminus_0_r.
-case: (Req_dec ((sol p s)[3]) 0) => [sol3e0|sol3ne0].
-  move=> _; move: circsol; rewrite sol3e0 [0 ^ 2]Rmult_0_l Rplus_0_r.
-  rewrite -Rsqr_pow2 -Rsqr_1 => /Rsqr_eq.
-  by apply: or_ind => ->; [exists (1%:R)|exists ord0].
-move/Rmult_integral; apply: or_ind => // /Rmult_integral; apply: or_ind => //.
-move=> /Rmult_integral gdivl0; exfalso; move: gdivl0; apply: or_ind.
-  exact: Rgt_not_eq.
-exact/Rinv_neq_0_compat/Rgt_not_eq.
+rewrite sol4e0 expr0n /= mul0r subr0.
+case: (eqVneq ((sol p s)..[3]) 0) => [sol3e0|sol3ne0].
+  move=> _; move: circsol; rewrite sol3e0 expr0n /= addr0.
+  rewrite -(expr1n [ringType of R] 2) => /eqP; rewrite eqf_sqr=> /orP [] /eqP->.
+    by exists 1.
+  by exists 0.
+move=> /eqP; rewrite mulrI_eq0; last exact/lregP.
+by rewrite mulrI_eq0=> [/eqP|] //; apply/lregP.
 Qed.
 
 Lemma En0_sol3_const p :
-  limS sol K p -> E p <> 0 -> forall t, 0 <= t -> (sol p t)[3] = p[3].
+  limS sol K p -> E p != 0 -> forall t, 0 <= t -> (sol p t)..[3] = p..[3].
 Proof.
 move=> limSKp Epn0 t tge0.
-have circsol s : 0 <= s -> (p[2] ^ 2) + ((sol p s)[3] ^ 2) = 1.
+have circsol s : 0 <= s -> p..[2] ^+ 2 + (sol p s)..[3] ^+ 2 = 1.
   move=> sge0; rewrite -(En0_sol2_const limSKp Epn0 sge0).
   suff [] : K (sol p s) by [].
   exact/subset_limSK_K/limSKinvar.
-set g := fun i : 'I_2 => if i == ord0 then sqrt (1 - (p[2] ^ 2))
-                                      else - (sqrt (1 - (p[2] ^ 2))).
+set g := fun i : 'I_2 => if i == 0 then Num.sqrt (1 - p..[2] ^+ 2)
+                                   else - (Num.sqrt (1 - p..[2] ^+ 2)).
 rewrite -[p in RHS]sol0.
-apply: (@cont_finimage_const (fun t => (sol p t)[3]) _ g) tge0.
-  move=> s sge0; apply: ex_derive_continuous.
+apply: (@continuous_finimage_cst (fun t => (sol p t)..[3]) _ g) tge0.
+  move=> s sge0; apply: (@differentiable_continuous [normedModType R of R^o]
+    [normedModType R of R^o]).
   have Kp : K p by apply: subset_limSK_K.
-  by have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: ex_deriv.
+  have [_ /(_ _ sge0) sol_ats]:= sol_is_sol sol0 solP Kp.
+  exact/derivable1_diffP.
 move=> s sge0.
-have /Rsqr_eq : Rsqr ((sol p s)[3]) = Rsqr (sqrt (1 - (p[2] ^ 2))).
-  have /circsol <- := sge0.
-  ring_simplify (p[2] ^ 2 + (sol p s)[3] ^ 2 - p[2] ^ 2).
-  by rewrite Rsqr_sqrt ?Rsqr_pow2 //; apply: pow2_ge_0.
-by apply: or_ind => [sols3eg0|sols3eg1]; [exists ord0|exists 1%:R].
+suff : (sol p s)..[3] ^+ 2 == (Num.sqrt (1 - p..[2] ^+ 2)) ^+2.
+  by rewrite eqf_sqr => /orP [/eqP ?|/eqP ?]; [exists 0|exists 1].
+have /circsol <- := sge0.
+by rewrite -addrA addrCA addrA addrK sqr_sqrtr // sqr_ge0.
 Qed.
 
 Lemma En0_sol4_eq0 p :
-  limS sol K p -> E p <> 0 -> forall t, 0 <= t -> (sol p t)[4] = 0.
+  limS sol K p -> E p != 0 -> forall t, 0 <= t -> (sol p t)..[4] = 0.
 Proof.
 move=> limSKp Epn0 t tge0.
 have Kp : K p by apply: subset_limSK_K.
 have [_ /(_ _ tge0) sol't] := sol_is_sol sol0 solP Kp.
-have /Rmult_integral : (sol p t)[3] * (sol p t)[4] = 0.
-  rewrite -[LHS]Ropp_involutive Ropp_mult_distr_l; apply/Ropp_eq_0_compat.
-  apply: (derive_nneg_eq (En0_sol2_const limSKp Epn0) tge0); last first.
-    exact: is_derive_const.
-  by apply: deriv_eq; rewrite mxE.
-apply: or_ind => // sol3eq0.
-have /Rmult_integral : (sol p t)[2] * (sol p t)[4] = 0.
-  apply: (derive_nneg_eq (En0_sol3_const limSKp Epn0) tge0); last first.
-    exact: is_derive_const.
-  by apply: deriv_eq; rewrite mxE.
-apply: or_ind => // sol2eq0; exfalso.
+have : (sol p t)..[3] * (sol p t)..[4] == 0.
+  rewrite -oppr_eq0 -mulNr; apply/eqP.
+  apply (is_derive_nneg_eq (En0_sol2_const limSKp Epn0) tge0); last first.
+    exact: is_derive_cst.
+  by apply: is_derive_eq; rewrite mxE.
+rewrite mulf_eq0 => /orP [] /eqP // sol3eq0.
+have /eqP : (sol p t)..[2] * (sol p t)..[4] = 0.
+  apply (is_derive_nneg_eq (En0_sol3_const limSKp Epn0) tge0); last first.
+    exact: is_derive_cst.
+  by apply: is_derive_eq; rewrite mxE.
+rewrite mulf_eq0 => /orP [] /eqP // sol2eq0.
 have [] : K (sol p t) by apply/Kinvar.
-rewrite sol3eq0 sol2eq0 ![_ ^ 2]Rmult_0_l Rplus_0_l => eq01 _.
-exact: R1_neq_R0.
+by rewrite sol3eq0 sol2eq0 expr0n /= addr0 => /eqP; rewrite eq_sym oner_eq0.
 Qed.
 
 Lemma En0_sol3_eq0 p t :
-  limS sol K p -> E p <> 0 -> 0 <= t -> (sol p t)[3] = 0.
+  limS sol K p -> E p != 0 -> 0 <= t -> (sol p t)..[3] = 0.
 Proof.
 move=> limSKp Epn0 tge0; rewrite En0_sol3_const => //.
-apply: or_ind (Req_dec (p[3]) 0) => // p3n0; exfalso; apply: p3n0.
-have : (Fpendulum (sol p 0))[4] = 0.
-  apply: (derive_nneg_eq (En0_sol4_eq0 limSKp Epn0) (Rle_refl 0)); last first.
-    exact: is_derive_const.
-  have Kp : K p by apply: subset_limSK_K.
-  have [_ /(_ _ (Rle_refl 0))] := sol_is_sol sol0 solP Kp.
-  exact: deriv_component.
-rewrite Fpendulum4E //; last exact: Rle_refl.
-rewrite sol0 => /Rmult_integral; apply: or_ind => // g0; exfalso.
-apply: Rmult_integral_contrapositive g0; split; first exact: Rgt_not_eq.
-exact/Rinv_neq_0_compat/Rgt_not_eq.
+case: (eqVneq (p..[3]) 0) => // p3n0.
+suff : (Fpendulum (sol p 0))..[4] = 0.
+  rewrite Fpendulum4E // sol0 => /eqP; rewrite mulrI_eq0; last exact/lregP.
+  by move/eqP.
+apply (is_derive_nneg_eq (En0_sol4_eq0 limSKp Epn0) (lerr 0)); last first.
+  exact: is_derive_cst.
+have Kp : K p by apply: subset_limSK_K.
+have [_ /(_ _ (lerr 0))] := sol_is_sol sol0 solP Kp.
+exact: is_derive_component.
 Qed.
 
 Lemma En0_sol2_eq1 p t :
-  limS sol K p -> E p <> 0 -> 0 <= t -> (sol p t)[2] = 1.
+  limS sol K p -> E p != 0 -> 0 <= t -> (sol p t)..[2] = 1.
 Proof.
 move=> limSKp Epn0 tge0.
 have [] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
-rewrite En0_sol3_eq0 // [0 ^ _]Rmult_0_l Rplus_0_r -Rsqr_pow2 -{1}Rsqr_1.
-case/Rsqr_eq => // sol2_eqm1 _; exfalso.
-suff : Rabs (E (sol p t)) < 2 * m * g * l.
-  rewrite /E sol1_eq0 // En0_sol4_eq0 // [0 ^ _]Rmult_0_l !Rmult_0_r !Rplus_0_r
-          Rmult_0_r Rplus_0_l sol2_eqm1.
-  by move=> /Rabs_def2 [_]; apply: Rle_not_lt; lra.
-rewrite -[X in _ < X]Rabs_pos_eq; last first.
-  by do 3 ?[apply: Rmult_le_pos; last exact: Rlt_le]; apply/Rlt_le/Rlt_0_2.
-apply: Rsqr_lt_abs_0; rewrite !Rsqr_pow2.
-have gt20 : 2 > 0 by apply/Rlt_gt/Rlt_0_2.
-have : 2 * (V (sol p t)) / ke < (2 * m * g * l) ^ 2.
-  apply/Rlt_div_l => //; rewrite Rmult_comm; apply/Rlt_div_r => //.
-  have Vsolp_s : V (sol p t) < B.
-    have [_ Vsolp_s] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
-    exact: Rle_lt_trans k0_valid.
-  apply: Rlt_le_trans Vsolp_s _.
-  rewrite /B Rmult_comm ![_ * _ / _]Rmult_assoc; apply/Rmult_le_compat_r.
-    by apply: Rdiv_le_0_compat; [apply: Rlt_le|apply: Rgt_lt].
-  apply: pow_incr; split; last exact: Rmin_r.
-  apply: Rmin_glb.
-    apply: Rdiv_le_0_compat; first exact: Rlt_le.
-    by apply: Rmult_lt_0_compat => //; apply: Rplus_lt_0_compat.
-  by do 3 ?[apply: Rmult_le_pos; last exact: Rlt_le]; apply: Rlt_le.
-apply: Rle_lt_trans; apply/(Rle_div_r (_ ^ 2)) => //.
-rewrite [X in _ <= X]Rmult_comm; apply/Rle_div_l; first exact/Rlt_gt/Rlt_0_2.
-rewrite [(_ ^ 2) * _ / _]Rmult_assoc Rmult_comm /V Rplus_assoc Rplus_comm.
-apply/Rle_minus_l; rewrite Rminus_eq_0.
-by apply: Rplus_le_le_0_compat; apply: Rmult_le_pos; try exact: pow2_ge_0;
-  apply: Rdiv_le_0_compat; try exact: Rlt_0_2; apply/Rlt_le.
+rewrite En0_sol3_eq0 // expr0n /= addr0 -{1}(expr1n [ringType of R] 2).
+move/eqP; rewrite eqf_sqr => /orP [] /eqP // sol2_eqN1 _.
+suff : `|E (sol p t)| < 2 * m%:num * g%:num * l%:num.
+  rewrite /E sol1_eq0 // En0_sol4_eq0 // expr0n /= !mulr0 !addr0 mulr0 add0r.
+  rewrite sol2_eqN1 -opprD mulrN absrN mulrC !mulrA mulrAC absRE.
+  by rewrite -(natrD _ 1 1) addn1 ltr_norml ltrr andbF.
+rewrite -[X in _ < X]ger0_norm // absRE -ltr_sqr ?nnegrE // -!normrX.
+do 2 rewrite ger0_norm ?sqr_ge0 //.
+suff : 2 * (V (sol p t)) / ke%:num < (2 * m%:num * g%:num * l%:num) ^+ 2.
+  apply: ler_lt_trans.
+  rewrite -mulrA -ler_pdivr_mull // ler_pdivl_mulr // mulrC mulrA.
+  by rewrite /V -addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
+rewrite ltr_pdivr_mulr // -ltr_pdivl_mull // mulrC [_ * ke%:num]mulrC.
+have /ltr_le_trans : V (sol p t) < B.
+  have [_ Vsolp_s] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
+  exact: ler_lt_trans k0_valid.
+rewrite /B; apply; apply: ler_pmul => //; apply: ler_pmul => //.
+by rewrite ler_expn2r // ?nnegrE // ler_minl lerr orbC.
 Qed.
 
 Lemma subset_limSK_homoclinic_orbit : limS sol K `<=` homoclinic_orbit.
 Proof.
-move=> p limSKp; rewrite homoclinicE.
-case: (Req_dec (E p) 0) => [Ep0|Epn0].
-  have := sol1_eq0 limSKp (Rle_refl _); rewrite sol0 => p10.
-  have := Efctrl_psol0_eq0 limSKp (Rle_refl _).
-  rewrite sol0 Ep0 Rmult_0_r Rmult_0_l Rplus_0_l => /Rmult_integral.
-  by apply: or_ind => // kx0; exfalso; apply: Rgt_not_eq kx0.
-exfalso; apply Epn0; have le00 := Rle_refl 0.
-by rewrite /E -[p]sol0 sol1_eq0 // En0_sol4_eq0 // En0_sol2_eq1 //; ring.
+move=> p limSKp; rewrite homoclinicE; case: (eqVneq (E p) 0) => [Ep0|Epn0].
+  have := sol1_eq0 limSKp (lerr _); rewrite sol0 => p10.
+  have := Efctrl_psol0_eq0 limSKp (lerr _).
+  rewrite sol0 Ep0 mulr0 mul0r add0r => /eqP.
+  by rewrite mulrI_eq0 => [/eqP|] //; apply/lregP.
+suff Ep0 : E p == 0 by move: Epn0; rewrite Ep0.
+rewrite /E -[p]sol0 sol1_eq0 // En0_sol4_eq0 // En0_sol2_eq1 // subrr expr0n /=.
+by rewrite !mulr0 !addr0 mulr0.
 Qed.
 
-Lemma cvg_to_homoclinic_orbit p : K p -> sol p @ +oo --> homoclinic_orbit.
+Lemma cvg_to_homoclinic_orbit p : K p ->
+  sol p @ +oo --> (homoclinic_orbit : set [uniformType of U]).
 Proof.
-move=> Kp; apply: cvg_to_superset subset_limSK_homoclinic_orbit _.
-exact: cvg_to_limS Kco Kinvar _ Kp.
+move=> Kp A [_/posnumP[e] hoe_A]; apply: cvg_to_limS K_compact Kinvar _ Kp _ _.
+exists e%:num => // q [r /subset_limSK_homoclinic_orbit hor re_q].
+by apply: hoe_A; exists r.
 Qed.
 
 End System.
