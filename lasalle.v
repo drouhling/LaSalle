@@ -336,10 +336,7 @@ move: tge0; rewrite ler_eqVlt orbC => /orP [tgt0|/eqP teq0].
     have -> /= : 0 <= s + t by near: s.
     by rewrite derive_val addrC addrA [_ s + _]addrC subrr add0r; near: s.
   end_near; rewrite /= locally_simpl; last first.
-    case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _).
-    apply/eqoP; rewrite (eqo_locally' _ erefl) //.
-    rewrite /the_littleo /insubd; case: (insubP _) => //= _ _ -> /=.
-    by rewrite [_%:A]mulr1 add0r opprD addrA subrr scale0r subr0.
+    by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
   exists t => // s; rewrite /AbsRing_ball /= absrB subr0 => ltst.
   rewrite -ler_subl_addl sub0r; apply/ltrW; apply: ler_lt_trans ltst.
   by rewrite absRE -normrN; apply: ler_norm.
@@ -354,18 +351,9 @@ rewrite -teq0 add0r shift0; apply/eqaddoP => _ /posnumP[e]; near=> s.
   rewrite mulr2n scalerDl scale1r -[_ - _ - sol _ _]addrA -opprD subrr sub0r.
   rewrite scaleNr opprK addrC addKr -[in X in _ <= X]normmN; near: s.
 end_near; rewrite /= locally_simpl.
-  case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
-  rewrite (eqo_locally' _ erefl) //.
-  rewrite /the_littleo /insubd; case: (insubP _) => //= _ _ -> /=.
-  by rewrite [_%:A]mulr1 add0r opprD addrA subrr scale0r subr0.
+  by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
 rewrite near_simpl -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
-case: e => /=; rewrite -[forall e, 0 < e -> _]/(littleo _ _ _); apply/eqoP.
-rewrite (eqo_locally' _ erefl) //.
-rewrite {1}/the_littleo /insubd insubT /=.
-  by apply/asboolP/eq_some_oP; rewrite oppo.
-move=> _; apply/eqP; rewrite oppr_eq0; apply/eqP.
-rewrite /the_littleo /insubd; case: (insubP _) => //= _ _ -> /=.
-by rewrite [_%:A]mulr1 add0r opprD addrA subrr scale0r subr0.
+by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
 Qed.
 
 Lemma solD p t0 t :
