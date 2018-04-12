@@ -43,46 +43,10 @@ Lemma plimn0 y (A : set U) :
   compact A -> (y @ +oo) A -> cluster (y @ +oo) !=set0.
 Proof. by move=> Aco /Aco [p []]; exists p. Qed.
 
-(* to mathcomp/analysis: generalize closed_bigI *)
-Lemma closed_bigsetI (T : topologicalType) (I : Type) (D : set I)
-  (f : I -> set T) :
-  (forall i, D i -> closed (f i)) -> closed (\bigcap_(i in D) f i).
-Proof.
-move=> fcl t clft i Di; have /fcl := Di; apply.
-by move=> A /clft [s [/(_ i Di)]]; exists s.
-Qed.
-
 Lemma closed_plim (y : R -> U) : closed (cluster (y @ +oo)).
 Proof.
-by rewrite clusterE; apply: closed_bigsetI => ??; apply: closed_closure.
+by rewrite clusterE; apply: closed_bigI => ??; apply: closed_closure.
 Qed.
-
-(* to mathcomp/analysis *)
-Lemma subset_D0 A (X Y : set A) : (X `<=` Y) = (X `\` Y = set0).
-Proof.
-rewrite propeqE; split=> [sXY|XDY0 a].
-  by rewrite predeqE => ?; split=> // - [?]; apply; apply: sXY.
-by apply: contrapTT => nYa xA; rewrite -[False]/(set0 a) -XDY0.
-Qed.
-Lemma setIl0 A (X Y : set A) : X = set0 -> X `&` Y = set0.
-Proof. by move=> X0; rewrite predeqE => ?; split=> // - []; rewrite X0. Qed.
-Lemma bigII A I (D : set I) (f : I -> set A) (X : set A) :
-  D !=set0 -> \bigcap_(i in D) f i `&` X = \bigcap_(i in D) (f i `&` X).
-Proof.
-move=> [i Di]; rewrite predeqE => a; split=> [[Ifa Xa] j Dj|IfIXa].
-  by split=> //; apply: Ifa.
-by split=> [j /IfIXa [] | ] //; have /IfIXa [] := Di.
-Qed.
-Lemma open_interior (T : topologicalType) (A : set T) : open (locally^~ A).
-Proof.
-rewrite openE => p; rewrite locallyE => - [B [[Bop Bp]]].
-by move=> /locally_open - /(_ Bop); exists B.
-Qed.
-
-(* to mathcomp/analysis *)
-Definition ball_set (A : set U) e := \bigcup_(p in A) ball p e.
-Canonical set_filter_source :=
-  @Filtered.Source Prop _ U (fun A => locally_ ball_set A).
 
 Lemma filter_cluster (F : set (set U)) (A : set U) :
   ProperFilter F -> F A -> compact A ->
@@ -91,17 +55,18 @@ Proof.
 move=> FF FA; rewrite compact_In0 => Aco e egt0.
 set B := ball_set (cluster F) e.
 have Fn0 : F !=set0 by exists A.
-have /(setIl0 A) : cluster F `\` locally^~ B = set0.
-  rewrite -subset_D0 => p clFp.
-  by rewrite -locally_ballE; exists e => // ??; exists p.
-rewrite setIC clusterE [_ `\` _]bigII // setIC bigII // => IFBoA0.
-set f := fun C => closure C `&` ~` (locally^~ B) `&` A.
+have : A `&` (cluster F `\` B^°) = set0.
+  suff -> : cluster F `\` B^° = set0 by rewrite setI0.
+  rewrite setD_eq0 => p clFp.
+  by rewrite /interior -locally_ballE; exists e => // ??; exists p.
+rewrite clusterE [_ `\` _]setI_bigcapl // setIC setI_bigcapl // => IFBoA0.
+set f := fun C => closure C `&` ~` B^° `&` A.
 have [G sGF IGBoA0] : exists2 G : {fset (set U)},
   {subset G <= F} & \bigcap_(C in [set C | C \in G]) f C = set0.
   have {IFBoA0} IFBoA0 : ~ (\bigcap_(C in F) f C !=set0).
     by move=> [p IFBoAp]; rewrite -[False]/(set0 p) -IFBoA0.
   have /Aco : closed_fam_of A F f.
-    exists (fun C => closure C `&` ~` (locally^~ B)).
+    exists (fun C => closure C `&` ~` B^°).
       move=> C _; apply: closedI (@closed_closure _ _) _.
       exact/closedC/open_interior.
     by move=> ? _; rewrite setIC.
@@ -112,10 +77,10 @@ have Gn0 : [set C | C \in G] !=set0.
   apply/NNP => /asboolPn /forallp_asboolPn G0.
   by rewrite -[False]/(@set0 U point) -IGBoA0 => ? /G0.
 move: IGBoA0; have -> : \bigcap_(C in [set C | C \in G]) f C =
-  \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` (locally^~ B)).
+  \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` B^°).
   by rewrite predeqE => a; split=> IGBoAa ? /IGBoAa [[]].
-rewrite -bigII // -subset_D0 => sIGABo.
-suff : F (locally^~ B) by apply: filterS => ?; apply: locally_singleton.
+rewrite -setI_bigcapl // setD_eq0 => sIGABo.
+suff : F B^° by apply: filterS => ?; apply: locally_singleton.
 apply: filterS sIGABo _; apply: filter_bigI => C /sGF; rewrite in_setE => FC.
 by apply: filterI FA _; apply: filterS (@subset_closure _ C) _.
 Qed.
@@ -165,35 +130,6 @@ have Ap : A p by apply: Acl => ? /clFp - /(_ _ FA).
 move=> /(fcont _ Ap) fp_C.
 suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).
 exact: filterI.
-Qed.
-Lemma ler_addgt0P (R : realFieldType) (x y : R) :
-  reflect (forall e, e > 0 -> x <= y + e) (x <= y).
-Proof.
-apply/(iffP idP)=> [lexy _/posnumP[e] | lexye]; first by rewrite ler_paddr.
-case: (lerP x y) => // ltyx.
-have /midf_lt [_] := ltyx; rewrite ltrNge -eqbF_neg => /eqP<-.
-suff -> : (y + x) / 2 = y + (x - y) / 2.
-  by apply/lexye/divr_gt0 => //; rewrite subr_gt0.
-by rewrite !mulrDl addrC -mulN1r -mulrA mulN1r [RHS]addrC {3}(splitr y)
-  [RHS]GRing.subrKA.
-Qed.
-Lemma in_segmentP (R : realFieldType) (x y z : R) :
-  reflect (forall e, e > 0 -> y \in `[(x - e), (z + e)]) (y \in `[x, z]).
-Proof.
-apply/(iffP idP)=> [xyz _/posnumP[e] | xyz_e].
-  rewrite inE; apply/andP; split; last by rewrite ler_paddr // (itvP xyz).
-  by rewrite ler_subl_addr ler_paddr // (itvP xyz).
-rewrite inE; apply/andP.
-by split; apply/ler_addgt0P => ? /xyz_e /andP []; rewrite ler_subl_addr.
-Qed.
-Lemma Rhausdorff : @hausdorff [topologicalType of R].
-Proof.
-move=> x y clxy; apply/eqP; rewrite eqr_le; apply/in_segmentP => _ /posnumP[e].
-rewrite inE -ler_distl -absRE; set he := (e%:num / 2)%:pos.
-have [z []] := clxy _ _ (locally_ball x he) (locally_ball y he).
-rewrite ball_absE /ball_ absrB => zx_he yz_he.
-rewrite (subr_trans z); apply: ler_trans (ler_abs_add _ _) _; apply/ltrW.
-by rewrite (splitr e%:num); apply: ltr_add.
 Qed.
 
 Lemma c0_cvg_cst_on_plim A y (V : U -> R) (l : R) :
@@ -248,24 +184,8 @@ Qed.
 
 Section DifferentialSystem.
 
-(* to mathcomp/analysis *)
-Lemma hausdorff_normedModType (K : absRingType) (V : normedModType K) :
-  @hausdorff V.
-Proof.
-move=> p q clp_q; apply/subr0_eq/normm0_eq0/Rhausdorff => A B pq_A.
-rewrite -(@normm0 _ V); have <- : p - p = 0 by apply/eqP; rewrite subr_eq0.
-move=> pp_B.
-suff loc_preim r C :
-  locally `|[p - r]| C -> locally r ((fun r => `|[p - r]|) @^-1` C).
-  have [r []] := clp_q _ _ (loc_preim _ _ pp_B) (loc_preim _ _ pq_A).
-  by exists `|[p - r]|.
-move=> [e egt0 pre_C]; apply: locally_le_locally_norm; exists e => // s re_s.
-apply: pre_C; apply: ler_lt_trans (ler_distm_dist _ _) _.
-by rewrite [p - _]addrC opprB -addrA [p + _]addrC subrK addrC normmB.
-Qed.
-
 Variable U : normedModType R.
-Let hU : hausdorff := @hausdorff_normedModType _ U.
+Let hU : hausdorff U := @normedModType_hausdorff _ U.
 
 (* function defining the differential system *)
 Variable F : U -> U.

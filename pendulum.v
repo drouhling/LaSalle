@@ -478,7 +478,7 @@ Qed.
 Lemma subset_limSK_K : limS sol K `<=` K.
 Proof.
 move=> p [q Kq solq_top].
-apply: compact_closed (@hausdorff_normedModType _ _) K_compact _ _.
+apply: compact_closed (@normedModType_hausdorff _ _) K_compact _ _.
 have solqK : (sol q @ +oo) K by exists 0 => ? /ltrW; apply: Kinvar.
 by move=> A /solq_top - /(_ _ solqK) [r []]; exists r.
 Qed.
