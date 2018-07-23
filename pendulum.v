@@ -2,8 +2,8 @@ Require Import Reals ssrring.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import matrix zmodp.
-From mathcomp Require Import boolp reals Rstruct Rbar set posnum topology.
-From mathcomp Require Import hierarchy landau derive.
+From mathcomp Require Import boolp reals Rstruct Rbar classical_sets posnum.
+From mathcomp Require Import topology hierarchy landau derive.
 Require Import lasalle.
 
 Set Implicit Arguments.
@@ -145,97 +145,87 @@ Lemma bounded_poly (a b c d : R) :
   a * (x ^+ 2) - (b * `|x|) - c < d -> `|x| < M.
 Proof.
 move=> agt0.
-have ptoinfty : (fun x => a * (x ^+ 2) - (b * `|x|) - c) @ +oo --> +oo.
-  move=> A [M sgtMA]; rewrite !near_simpl; near=> x.
-  have lt0x : 0 < x by near: x.
-  rewrite ger0_norm ?ltrW //; apply: sgtMA.
-  rewrite ltr_subr_addr expr2 mulrA -mulrBl; apply: ler_lt_trans (ler_norm _) _.
-  rewrite -[ `|_|%R]sqr_sqrtr // expr2; apply: ltr_pmul=> //; last by near: x.
-  - exact: sqrtr_ge0.
-  - exact: sqrtr_ge0.
-  - by rewrite ltr_subr_addr -ltr_pdivr_mull //; near: x.
-end_near; rewrite /= locally_simpl; first by exists 0.
-    by exists (Num.sqrt `|M + c|).
-  by exists (a^-1 * (Num.sqrt `|M + c| + b)).
-have dleatinfty : [filter of +oo] (>= d) by exists d => ? /ltrW.
-have /ptoinfty [M1 sgtM1pged] := dleatinfty; near=> M.
+suff ptoinfty : (fun x => a * (x ^+ 2) - (b * `|x|) - c) @ +oo --> +oo.
+  have dleatinfty : [filter of +oo] (>= d) by exists d => ? /ltrW.
+  have /ptoinfty [M1 sgtM1pged] := dleatinfty; near=> M.
   move=> x pxltd; rewrite ltrNge; apply/negP => Mlex.
   move: pxltd; rewrite ltrNge => /negP; apply.
-  rewrite -(@ger0_norm _ `|x|); last by apply: ler_trans Mlex; near: M.
-  rewrite -(@ger0_norm _ (_ ^+ 2)) ?sqr_ge0 // normrX; apply: sgtM1pged.
-  by apply: ltr_le_trans Mlex; near: M.
-by end_near; [exists 0 => ? /ltrW|exists M1].
-Qed.
+  rewrite -(@ger0_norm _ `|x|) // -(@ger0_norm _ (_ ^+ 2)) ?sqr_ge0 // normrX.
+  by apply: sgtM1pged; apply: ltr_le_trans Mlex; near: M; exists M1.
+move=> A [M sgtMA]; rewrite !near_simpl; near=> x.
+have lt0x : 0 < x by near: x; exists 0.
+rewrite ger0_norm ?ltrW //; apply: sgtMA.
+rewrite ltr_subr_addr expr2 mulrA -mulrBl; apply: ler_lt_trans (ler_norm _) _.
+rewrite -[ `|_|%R]sqr_sqrtr // expr2; apply: ltr_pmul; last 1 first.
+- by near: x; exists (Num.sqrt `|M + c|).
+- exact: sqrtr_ge0.
+- exact: sqrtr_ge0.
+rewrite ltr_subr_addr -ltr_pdivr_mull //; near: x.
+by exists (a^-1 * (Num.sqrt `|M + c| + b)).
+Grab Existential Variables. all: end_near. Qed.
 
 Lemma K_bounded : bounded K.
 Proof.
 suff : \forall M \near +oo, forall p, K p -> forall i, `|p ord0 i| < M.
   rewrite /bounded; apply: filter_app; near=> M.
-    move=> Kbnd p /Kbnd ltpM; apply/bigmaxr_ltrP => [|i seqi].
-      by rewrite size_map -cardE card_prod !cardE !size_enum_ord.
-    rewrite (nth_map 0); last by move: seqi; rewrite size_map.
-    by rewrite ord1 ltpM.
-  by end_near.
+  move=> Kbnd p /Kbnd ltpM; apply/bigmaxr_ltrP => [|i seqi].
+    by rewrite size_map -cardE card_prod !cardE !size_enum_ord.
+  by rewrite (nth_map 0); [rewrite ord1 ltpM|move: seqi; rewrite size_map].
 suff : \forall M \near +oo, forall p, K p -> `| p..[0] | < M /\
   `| p..[1] | < M /\ `| p..[2] | < M /\ `| p..[3] | < M /\ `| p..[4] | < M.
   apply: filter_app; near=> M.
-    move=> Kbnd p /Kbnd [ltp0M [ltp1M [ltp2M [ltp3M ltp4M]]]].
-    case; do 5 ?[case; first by move=> ?; rewrite -[ Ordinal _ ]natr_Zp Zp_nat].
-    by move=> n ?; suff : (n.+1.+4 < 5)%N by rewrite !ltnS ltn0.
-  by end_near.
+  move=> Kbnd p /Kbnd [ltp0M [ltp1M [ltp2M [ltp3M ltp4M]]]].
+  case; do 5 ?[case; first by move=> ?; rewrite -[ Ordinal _ ]natr_Zp Zp_nat].
+  by move=> n ?; suff : (n.+1.+4 < 5)%N by rewrite !ltnS ltn0.
 have K1bnd : \forall M \near +oo, forall p, K p -> `| p..[1] | < M.
-  near=> M.
-    move=> p [_ Vps].
+  near=> M => p [_ Vps].
     suff /ltr_trans : `| p..[1] | < Num.sqrt (2 * B / kv%:num).
-      by apply; near: M.
-    rewrite absRE -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
-    apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
-    by rewrite [V _]addrAC ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
-  by end_near; eexists => ?; apply.
+    by apply; near: M; exists (Num.sqrt (2 * B / kv%:num)).
+  rewrite absRE -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+  apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
+  by rewrite [V _]addrAC ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
 apply: filter_app (K1bnd); near=> M.
-  move=> K1ltM p Kp; have [circp Vps] := Kp; split.
-    suff /ltr_trans : `| p..[0] | < Num.sqrt (2 * B / kx%:num).
-      by apply; near: M.
-    rewrite absRE -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
-    apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
-    by rewrite ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
-  split; first exact: K1ltM; split.
-    suff /ler_lt_trans : `| p..[2] | <= 1 by apply; near: M.
-    by rewrite absRE -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
-  split.
-    suff /ler_lt_trans : `| p..[3] | <= 1 by apply; near: M.
-    by rewrite absRE -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addr sqr_ge0.
-  by move: p Kp {circp Vps}; near: M.
-end_near; rewrite /= !near_simpl; do ?[eexists => ?; exact].
+move=> K1ltM p Kp; have [circp Vps] := Kp; split.
+  suff /ltr_trans : `| p..[0] | < Num.sqrt (2 * B / kx%:num).
+    by apply; near: M; exists (Num.sqrt (2 * B / kx%:num)).
+  rewrite absRE -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+  apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
+  by rewrite ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
+split; first exact: K1ltM; split.
+  suff /ler_lt_trans : `| p..[2] | <= 1 by apply; near: M; exists 1.
+  by rewrite absRE -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
+split.
+  suff /ler_lt_trans : `| p..[3] | <= 1 by apply; near: M; exists 1.
+  by rewrite absRE -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addr sqr_ge0.
+move: p Kp {circp Vps}; near: M; rewrite /= !near_simpl.
 have [M1 sgtM1gtK1] := K1bnd.
 have := bounded_poly (m%:num * l%:num * ((`|M1| + 1) ^+ 2))
   (m%:num * l%:num * g%:num * ((`|M1| + 1) + 1)) (Num.sqrt (2 * B / ke%:num))
   [gt0 of m%:num * (l%:num ^+ 2) / 2].
-apply: filter_app; near=> M.
-  move=> sEsltM p Kp; have [circp Vps] := Kp; apply: sEsltM.
-  have : E p < Num.sqrt (2 * B / ke%:num).
-    apply: ler_lt_trans (ler_norm _) _.
-    rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
-    apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
-    by rewrite -[V _]addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
-  apply: ler_lt_trans; apply: ler_add; last first.
-    rewrite -mulrN opprD ler_wpmul2l // ler_add2r ler_oppl.
-    rewrite ler_paddl // (ler_trans (ler_norm _)) // normrN.
-    by rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
-  rewrite mulrDr [1 / 2 * _ + _]addrC -addrA [1 / 2 * _]mulrCA mul1r mulrA.
-  rewrite (expr2 l%:num) ler_add2l; apply: ler_paddl.
-    by rewrite pmulr_rge0 // pmulr_rge0 // sqr_ge0.
-  rewrite -mulrN -!mulrA ler_wpmul2l // ler_wpmul2l // !mulrN ler_oppl.
-  suff : `| p..[1] | * (`| p..[2] | * `| p..[4] |) <=
-    (`|M1| + 1) * ((`|M1| + 1) * `| p..[4] |).
-    by apply: ler_trans; rewrite -!normrM -normrN ler_norm.
-  rewrite !mulrA ler_wpmul2r // ler_pmul //.
-    apply/ltrW/sgtM1gtK1 => //; apply: ler_lt_trans (ler_norm _) _.
-    by rewrite ltr_addl.
-  have /(ler_trans _) : 1 <= `|M1| + 1 by rewrite ler_addr.
-  by apply; rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
-by end_near.
-Qed.
+apply: filter_app; near=> M => sEsltM p Kp; have [circp Vps] := Kp.
+apply: sEsltM.
+have : E p < Num.sqrt (2 * B / ke%:num).
+  apply: ler_lt_trans (ler_norm _) _.
+  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+  apply: ler_lt_trans k0_valid; apply: ler_trans Vps.
+  by rewrite -[V _]addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
+apply: ler_lt_trans; apply: ler_add; last first.
+  rewrite -mulrN opprD ler_wpmul2l // ler_add2r ler_oppl.
+  rewrite ler_paddl // (ler_trans (ler_norm _)) // normrN.
+  by rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
+rewrite mulrDr [1 / 2 * _ + _]addrC -addrA [1 / 2 * _]mulrCA mul1r mulrA.
+rewrite (expr2 l%:num) ler_add2l; apply: ler_paddl.
+  by rewrite pmulr_rge0 // pmulr_rge0 // sqr_ge0.
+rewrite -mulrN -!mulrA ler_wpmul2l // ler_wpmul2l // !mulrN ler_oppl.
+suff : `| p..[1] | * (`| p..[2] | * `| p..[4] |) <=
+  (`|M1| + 1) * ((`|M1| + 1) * `| p..[4] |).
+  by apply: ler_trans; rewrite -!normrM -normrN ler_norm.
+rewrite !mulrA ler_wpmul2r // ler_pmul //.
+  apply/ltrW/sgtM1gtK1 => //; apply: ler_lt_trans (ler_norm _) _.
+  by rewrite ltr_addl.
+have /(ler_trans _) : 1 <= `|M1| + 1 by rewrite ler_addr.
+by apply; rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
+Unshelve. all: end_near. Grab Existential Variables. all: end_near. Qed.
 
 Lemma K_compact : compact K.
 Proof. exact: bounded_closed_compact K_bounded K_closed. Qed.
@@ -519,11 +509,10 @@ have /@derive_val <- := df; have /@derive_val <- := dg.
 apply: subr0_eq; rewrite -deriveB // /derive cvg_at_rightE; last first.
   by rewrite -[cvg _]/(derivable _ _ _).
 apply: flim_map_lim => A A0; rewrite !near_simpl; near=> h.
-  rewrite /= -![(_ - _ : _ -> _) _]/(_ - _) !feg //.
-    by rewrite !subrr scaler0; apply: locally_singleton.
-  by rewrite addr_ge0 // [_%:A]mulr1 ltrW //; near: h.
-by end_near; rewrite /= locally_simpl; exists 1.
-Qed.
+rewrite /= -![(_ - _ : _ -> _) _]/(_ - _) !feg //.
+  by rewrite !subrr scaler0; apply: locally_singleton.
+by rewrite addr_ge0 // [_%:A]mulr1 ltrW //; near: h; exists 1.
+Grab Existential Variables. all: end_near. Qed.
 
 Lemma sol1'_eq0 p t : limS sol K p -> 0 <= t -> (Fpendulum (sol p t))..[1] = 0.
 Proof.

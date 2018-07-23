@@ -1,8 +1,8 @@
 Require Import Reals.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
-From mathcomp Require Import boolp reals Rstruct Rbar set posnum topology.
-From mathcomp Require Import hierarchy landau derive.
+From mathcomp Require Import boolp reals Rstruct Rbar classical_sets posnum.
+From mathcomp Require Import topology hierarchy landau derive.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -153,18 +153,16 @@ wlog Ngt0 : N ybndN / 0 < N.
   move=> bnd_plim; apply: (bnd_plim (maxr N 1)); last first.
     by rewrite ltr_maxr orbC ltr01.
   by move=> ?; rewrite ltr_maxl => /andP [/ybndN].
-near=> M.
-  move=> p plimp.
-  have [] := plimp (y @` (>= 0)) (ball_ norm p (PosNum Ngt0)%:num).
-      exact: sub_image_at_infty.
-    exact: locally_ball_norm.
-  move=> _ [[t tge0 <-] pN_yt]; rewrite -[p](subrK (y t)).
-  apply: ler_lt_trans (ler_normm_add _ _) _.
-  rewrite -ltr_subr_addr; apply: ltr_trans pN_yt _.
-  rewrite ltr_subr_addr addrC -ltr_subr_addr.
-  by apply: ybndN; [rewrite ltr_subr_addr; near: M|exists t].
-by end_near; exists (N + N).
-Qed.
+near=> M => p plimp.
+have [] := plimp (y @` (>= 0)) (ball_ norm p (PosNum Ngt0)%:num).
+- exact: sub_image_at_infty.
+- exact: locally_ball_norm.
+move=> _ [[t tge0 <-] pN_yt]; rewrite -[p](subrK (y t)).
+apply: ler_lt_trans (ler_normm_add _ _) _.
+rewrite -ltr_subr_addr; apply: ltr_trans pN_yt _.
+rewrite ltr_subr_addr addrC -ltr_subr_addr; apply: ybndN; last by exists t.
+by rewrite ltr_subr_addr; near: M; exists (N + N).
+Grab Existential Variables. all: end_near. Qed.
 
 Lemma continuous_on_compact (S T : topologicalType) (f : S -> T) (A : set S) :
   continuous_on A f -> compact A -> compact (f @` A).
@@ -250,31 +248,30 @@ have /solp solp' : 0 <= t + t0 by apply: addr_ge0 => //; apply: ltrW.
 rewrite /shift_sol tge0.
 move: tge0; rewrite ler_eqVlt orbC => /orP [tgt0|/eqP teq0].
   apply/eqaddoP => _ /posnumP[e]; near=> s.
-    rewrite -![(_ + _ : _ -> _) _]/(_ + _) /=.
-    have /derivable_locally : derivable (sol p : R^o -> U) (t + t0) 1 by [].
-    rewrite funeqE => /(_ s) /=; rewrite addrA [_%:A]mulr1 =>->.
-    have -> /= : 0 <= s + t by near: s.
-    by rewrite derive_val addrC addrA [_ s + _]addrC subrr add0r; near: s.
-  end_near; rewrite /= locally_simpl; last first.
+  rewrite -![(_ + _ : _ -> _) _]/(_ + _) /=.
+  have /derivable_locally : derivable (sol p : R^o -> U) (t + t0) 1 by [].
+  rewrite funeqE => /(_ s) /=; rewrite addrA [_%:A]mulr1 =>->.
+  suff -> /= : 0 <= s + t.
+    rewrite derive_val addrC addrA [_ s + _]addrC subrr add0r; near: s.
     by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
-  exists t => // s; rewrite /AbsRing_ball /= absrB subr0 => ltst.
+  near: s; exists t => // s; rewrite /AbsRing_ball /= absrB subr0 => ltst.
   rewrite -ler_subl_addl sub0r; apply/ltrW; apply: ler_lt_trans ltst.
   by rewrite absRE -normrN; apply: ler_norm.
 rewrite -teq0 add0r shift0; apply/eqaddoP => _ /posnumP[e]; near=> s.
-  rewrite -![(_ + _ : _ -> _) _]/(_ + _) /= -[t0]add0r teq0.
-  have /derivable_locally dsol : derivable (sol p : R^o -> U) (t + t0) 1 by [].
-  have := dsol; rewrite funeqE => /(_ (- s)) /=; rewrite [_%:A]mulr1 =>->.
-  have := dsol; rewrite funeqE => /(_ s) /=; rewrite [_%:A]mulr1 =>->.
-  rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
-    by rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
-  rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _) _]/(- _) !addrA.
-  rewrite mulr2n scalerDl scale1r -[_ - _ - sol _ _]addrA -opprD subrr sub0r.
-  rewrite scaleNr opprK addrC addKr -[in X in _ <= X]normmN; near: s.
-end_near; rewrite /= locally_simpl.
+rewrite -![(_ + _ : _ -> _) _]/(_ + _) /= -[t0]add0r teq0.
+have /derivable_locally dsol : derivable (sol p : R^o -> U) (t + t0) 1 by [].
+have := dsol; rewrite funeqE => /(_ (- s)) /=; rewrite [_%:A]mulr1 =>->.
+have := dsol; rewrite funeqE => /(_ s) /=; rewrite [_%:A]mulr1 =>->.
+rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
+  rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
   by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
-rewrite near_simpl -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
+rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _) _]/(- _) !addrA.
+rewrite mulr2n scalerDl scale1r -[_ - _ - sol _ _]addrA -opprD subrr sub0r.
+rewrite scaleNr opprK addrC addKr -[in X in _ <= X]normmN; near: s.
+rewrite locally_simpl near_simpl.
+rewrite -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
 by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
-Qed.
+Grab Existential Variables. all: end_near. Qed.
 
 Lemma solD p t0 t :
   K p -> 0 <= t0 -> 0 <= t -> sol p (t + t0) = sol (sol p t0) t.
@@ -345,10 +342,9 @@ suff : exists l, cluster (sol q @ +oo) `<=` V @^-1` [set l].
     apply: Vsol_drvbl => //; apply: compact_closed => //.
     exact: sub_plim_clos_invar plimp.
   apply: flim_map_lim => A A0; rewrite !near_simpl; near=> h.
-    rewrite /= sol0 addr0 [_%:A]mulr1 Vpliml.
-      by rewrite Vpliml // subrr scaler0; apply: locally_singleton.
-    by apply: invariant_plim => //; apply: ltrW; near: h.
-  by end_near; rewrite /= locally_simpl; exists 1.
+  rewrite /= sol0 addr0 [_%:A]mulr1 Vpliml.
+    by rewrite Vpliml // subrr scaler0; apply: locally_singleton.
+  by apply: invariant_plim => //; apply: ltrW; near: h; exists 1.
 suff cvVsol : cvg (V \o sol q @ +oo).
   exists (lim (V \o sol q @ +oo)); apply: (c0_cvg_cst_on_plim Vcont)=> //.
   exact: compact_closed.
@@ -368,12 +364,12 @@ suff -> : derive1 (V \o sol q) r = derive1 (V \o (sol (sol q r))) 0.
 rewrite derive1E /derive cvg_at_rightE; last exact: Vsol_drvbl.
 rewrite derive1E /derive cvg_at_rightE; last first.
   by apply: Vsol_drvbl => //; apply: Kinvar.
-congr (lim _); congr (default_filter_on_term _); rewrite predeqE /= => A; split.
+congr (lim _); rewrite predeqE /= locally_filterE => A; split.
   move=> [_/posnumP[e] Ae]; exists e%:num => // x xe xgt0.
   by rewrite sol0 addr0 -solD //; [apply: Ae|rewrite [_%:A]mulr1 ltrW].
 move=> [_/posnumP[e] Ae]; exists e%:num => // x xe xgt0.
 by have /Ae - /(_ xe) := xgt0; rewrite sol0 addr0 -solD // [_%:A]mulr1 ltrW.
-Qed.
+Grab Existential Variables. all: end_near. Qed.
 
 Lemma cvg_to_limS (A : set U) : compact A -> is_invariant A ->
   forall p, A p -> sol p @ +oo --> (limS A : set [uniformType of U]).
