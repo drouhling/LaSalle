@@ -253,7 +253,7 @@ move: tge0; rewrite ler_eqVlt orbC => /orP [tgt0|/eqP teq0].
   rewrite funeqE => /(_ s) /=; rewrite addrA [_%:A]mulr1 =>->.
   suff -> /= : 0 <= s + t.
     rewrite derive_val addrC addrA [_ s + _]addrC subrr add0r; near: s.
-    by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
+    by case: e => /=; apply/(eqoP (locally_filter_on (0 : R))).
   near: s; exists t => // s; rewrite /AbsRing_ball /= absrB subr0 => ltst.
   rewrite -ler_subl_addl sub0r; apply/ltrW; apply: ler_lt_trans ltst.
   by rewrite absRE -normrN; apply: ler_norm.
@@ -264,13 +264,12 @@ have := dsol; rewrite funeqE => /(_ (- s)) /=; rewrite [_%:A]mulr1 =>->.
 have := dsol; rewrite funeqE => /(_ s) /=; rewrite [_%:A]mulr1 =>->.
 rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
   rewrite addrC addrA [_ s + _]addrC subrr add0r; near: s.
-  by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
+  by case: e => /=; apply/(eqoP (locally_filter_on (0 : R))).
 rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _) _]/(- _) !addrA.
 rewrite mulr2n scalerDl scale1r -[_ - _ - sol _ _]addrA -opprD subrr sub0r.
 rewrite scaleNr opprK addrC addKr -[in X in _ <= X]normmN; near: s.
-rewrite locally_simpl near_simpl.
-rewrite -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
-by case: e => /=; rewrite -[forall e, _ -> _]/(littleo _ _ _); apply/eqoP.
+rewrite !near_simpl -(nearN (fun x : R^o => `|[_ x]| <= e%:num * `|[x]|)).
+by case: e => /=; apply/(eqoP (locally_filter_on (0 : R))).
 Grab Existential Variables. all: end_near. Qed.
 
 Lemma solD p t0 t :

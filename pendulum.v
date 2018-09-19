@@ -653,19 +653,19 @@ move=> s s0t fsemid; suff ltfl_inf : fl < inf img.
       by rewrite fsemid => midegi; apply/asboolP; exists i.
     by rewrite ltr_pdivl_mulr // mulrC mul2r ltr_add2l.
   by rewrite ler_pdivl_mulr // mulrC mul2r ler_add2r lerNgt ltfl_inf.
-have imgE : img = pred_of_finset
-  (seq_fset [seq t <- [seq g i | i : 'I_n.+2] | fl < t]) :> pred R.
-  rewrite funeqE => x; rewrite /img /= /pred_of_finset seq_fsetE .
+have imgE : img = pred_of_finset [fset x in
+  [seq t <- [seq g i | i : 'I_n.+2] | fl < t]]%fset :> pred R.
+  rewrite funeqE => x; rewrite /img /= /pred_of_finset in_fset.
   apply: (@sameP ((fl < x) /\ x \in (g @` setT))); first exact: andP.
   apply: (iffP idP) => [|[ltflx /asboolP [i _ giex]]].
     rewrite mem_filter => /andP [ltflx /mapP [i _ xegi]]; split=> //.
     by apply/asboolP; exists i.
   rewrite mem_filter ltflx andTb; apply/mapP; exists i => //.
   by rewrite enumT.
-rewrite imgE; set A := seq_fset _.
+rewrite imgE; set A := [fset x in _]%fset.
 have : inf (pred_of_finset A) \in A.
   by apply: inf_in_finset; rewrite -[X in has_inf X]imgE.
-by rewrite /A seq_fsetE mem_filter => /andP [].
+by rewrite /A in_fset mem_filter => /andP [].
 Qed.
 
 Lemma poly2_factor (a b c x : R) :
