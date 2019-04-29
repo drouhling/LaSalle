@@ -3,7 +3,7 @@ From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import matrix zmodp.
 From mathcomp Require Import boolp reals Rstruct Rbar classical_sets posnum.
-From mathcomp Require Import topology hierarchy landau derive.
+From mathcomp Require Import topology normedtype landau derive.
 Require Import lasalle.
 
 Set Implicit Arguments.
@@ -110,7 +110,7 @@ Definition K : set U :=
 
 Lemma expr_continuous n : continuous (fun x : R^o => x ^+ n.+1 : R^o).
 Proof.
-move=> x; suff : differentiable x (fun y => y ^+ n.+1).
+move=> x; suff : differentiable (fun y : R^o => y ^+ n.+1) x.
   by apply: differentiable_continuous.
 suff -> : (fun y => y ^+ n.+1) = ((id : R^o -> R^o) ^+ n.+1) by [].
 by rewrite exprfunE.
@@ -293,9 +293,10 @@ Qed.
 Lemma circ_invar p :
   K p -> forall t, 0 <= t -> (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1.
 Proof.
-move=> Kp t tge0; have [circp _] := Kp; rewrite -circp -[in RHS](sol0 p).
-apply (@eq0_derive1_cst (fun s => (sol p s)..[2] ^+ 2 + (sol p s)..[3] ^+ 2) _
-  t); last by rewrite inE lerr tge0.
+move=> Kp /= t tge0; have [circp _] := Kp; rewrite -circp -[in RHS](sol0 p).
+pose f s := (sol p s)..[2] ^+ 2 + (sol p s)..[3] ^+ 2; rewrite -!/(f _).
+(* BUG in unification *)
+apply (@eq0_derive1_cst (f : R^o -> R^o) 0 t); last by rewrite inE/= lerr tge0.
 move=> s s0t; have sge0 : s >= 0 by rewrite (itvP s0t).
 have [_ /(_ _ sge0) dsol] := sol_is_sol sol0 solP Kp.
 apply: is_derive_eq.
@@ -379,7 +380,7 @@ have Vsolpinf_geB : B <= V (sol p (inf A)).
   case: (lerP B (V (sol p (inf A)))) => // Vsolpinf_ltB; rewrite falseE.
   have Vsolp_cont : {for inf A, continuous (V \o (sol p))}.
     suff /differentiable_continuous :
-      differentiable (inf A : R^o) (V \o sol p : _ -> R^o) by [].
+      differentiable (V \o sol p : R^o -> R^o) (inf A) by [].
     exact/derivable1_diffP/Vsolp_drvbl.
   have BmVsolps_gt0 : 0 < B - V (sol p (inf A)) by rewrite subr_gt0.
   have /Vsolp_cont := locally_ball (V (sol p (inf A))) (PosNum BmVsolps_gt0).
@@ -404,7 +405,7 @@ have Vsol_drvbl t : t \in `]0, (inf A)[ ->
   by rewrite (itvP t0inf).
 have : {in `[0, (inf A)], continuous (V \o sol p)}.
   move=> t t0inf; suff /differentiable_continuous :
-    differentiable (t : R^o) (V \o sol p : _ -> R^o) by [].
+    differentiable (V \o sol p : R^o -> R^o) t by [].
   by apply/derivable1_diffP/Vsolp_drvbl; rewrite (itvP t0inf).
 move=> /(MVT infge0 Vsol_drvbl) [t t0inf].
 rewrite /funcomp sol0 subr0 => dVsol.
@@ -526,7 +527,7 @@ Lemma sol0_const p t : limS sol K p -> 0 <= t -> (sol p t)..[0] = p..[0].
 Proof.
 move=> limSKp tge0; rewrite -[p in RHS]sol0.
 apply (@eq0_derive1_cst (fun s => (sol p s)..[0]) 0 t); last first.
-  by rewrite inE lerr tge0.
+  by rewrite inE/= lerr tge0.
 move=> s /andP [sge0 _]; have /subset_limSK_K Kp := limSKp.
 have [_ /(_ _ sge0) /(is_derive_component 0) dsol0] := sol_is_sol sol0 solP Kp.
 by apply: DeriveDef => //; rewrite derive_val mxE /= sol1_eq0.
@@ -536,7 +537,7 @@ Lemma Esol_const p t : limS sol K p -> 0 <= t -> (E \o sol p) t = E p.
 Proof.
 move=> limSKp tge0; rewrite -[p in RHS]sol0.
 apply (@eq0_derive1_cst (E \o sol p) 0 t); last first.
-  by rewrite inE lerr tge0.
+  by rewrite inE/= lerr tge0.
 move=> s /andP [sge0 _]; have /subset_limSK_K Kp := limSKp.
 have dEsol := is_derive_Esol Kp sge0; apply: DeriveDef => //.
 by rewrite derive_val sol1_eq0 // mul0r.

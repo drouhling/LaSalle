@@ -2,7 +2,7 @@ Require Import Reals.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import boolp reals Rstruct Rbar classical_sets posnum.
-From mathcomp Require Import topology hierarchy landau derive.
+From mathcomp Require Import topology normedtype landau derive.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -74,7 +74,7 @@ have [G sGF IGBoA0] : exists2 G : {fset (set U)},
   move=> /imply_asboolPn [sHF IHBoA0]; exists H => //.
   by rewrite predeqE => p; split=> // IHBoAp; apply: IHBoA0; exists p.
 have Gn0 : [set C | C \in G] !=set0.
-  apply/NNP => /asboolPn /forallp_asboolPn G0.
+  apply: contrapT => /asboolPn /forallp_asboolPn G0.
   by rewrite -[False]/(@set0 U point) -IGBoA0 => ? /G0.
 move: IGBoA0; have -> : \bigcap_(C in [set C | C \in G]) f C =
   \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` B^°).
@@ -231,14 +231,14 @@ move=> Kp t0ge0; split=> [t tlt0|t tge0].
   by rewrite /shift_sol lerNgt tlt0 lerr add0r ltrW ?oppr_gt0.
 suff dshift : (shift_sol p t0) \o shift t = cst (shift_sol p t0 t) +
   (fun h => h *: F (shift_sol p t0 t)) +o_ (0 : R^o) id.
-  have dshiftE : 'd_(t : R^o) (shift_sol p t0) =
+  have dshiftE : 'd (shift_sol p t0) (t : R^o) =
     (fun h => h *: F (shift_sol p t0 t)) :> (R^o -> U).
     have lin_scal : linear (fun h : R^o => h *: F (shift_sol p t0 t)).
       by move=> ???; rewrite scalerDl scalerA.
     have ->: (fun h : R^o => h *: F (shift_sol p t0 t)) = Linear lin_scal by [].
     apply: diff_unique; first exact: scalel_continuous.
     by apply/eqaddoE; rewrite dshift.
-  have diff_shift : differentiable (t : R^o) (shift_sol p t0).
+  have diff_shift : differentiable (shift_sol p t0 : R^o -> _) t.
     apply/diff_locallyP; split; last by apply/eqaddoE; rewrite dshift dshiftE.
     by rewrite dshiftE; apply: scalel_continuous.
   apply: DeriveDef; first exact/derivable1_diffP.
