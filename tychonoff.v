@@ -706,15 +706,15 @@ split=> [Aop|].
 move=> [[J f] /= [finIf BeqUf]] v Av.
 have : B (v ord0) by rewrite /B row_simpl.
 rewrite BeqUf => - [j _ fjv]; have [K [toI [g [gop fjeqIg]]]] := finIf j.
-suff [e ve_fj] : locally (v ord0) (f j).
+suff [e ve_fj] : locally (v ord0 : _ -> _) (f j).
   exists e => w ve_w; rewrite -[w]row_simpl -[A _]/(B _) BeqUf; exists j => //.
   exact: ve_fj.
 have := fjv; rewrite fjeqIg => Igv.
-have v_g : forall k, locally (v ord0) (g k).
+have v_g : forall k, locally (v ord0 : _ -> _) (g k).
   move=> k; have [C [Cop geqCpreim]] := gop k.
   rewrite geqCpreim; apply: locally_preimage (@continuous_component _ _ _ _) _.
   by apply: Cop; have := Igv k; rewrite geqCpreim; apply.
-have {v_g} v_g : forall k, {ek : posreal | ball (v ord0) ek `<=` g k}.
+have {v_g} v_g : forall k, {ek : posreal | ball (v ord0 : _ -> _) ek `<=` g k}.
   by move=> k; apply: constructive_indefinite_description; apply: v_g.
 have := mem_enum K; case: (enum K)=> [K0|k l kleqK].
   by exists (mkposreal _ Rlt_0_1)=> ?? i; have := K0 i.

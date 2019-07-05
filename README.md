@@ -3,8 +3,8 @@
 This repository contains a formal proof in Coq of LaSalle's invariance
 principle.
 
-It requires Coq v8.6, the Mathematical Components library v1.6.1 and the
-Coquelicot library v3.0.0. It also depends on Daniel Schepler's proof of [Zorn's
+It requires Coq v8.9.1, the Mathematical Components library v1.9.0 and the
+Coquelicot library v3.0.2. It also depends on Daniel Schepler's proof of [Zorn's
 lemma](https://github.com/coq-contribs/zorns-lemma).
 
 It is organised as follows:
