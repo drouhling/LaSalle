@@ -132,7 +132,7 @@ by rewrite (splitr e%:num) ltr_add //; [apply/p2e1_sp2he|apply/p3e2_sp3he];
   apply: ball_ler (pme12_q _ _); rewrite ler_minl lerr // orbC.
 Qed.
 
-Lemma preimV_lek0_closed : closed (V @^-1` (<= k0)).
+Lemma preimV_lek0_closed : closed (V @^-1` (<= k0 : _ -> _)).
 Proof.
 by apply: closed_comp; [move=> ??; apply: V_continuous|apply: closed_le].
 Qed.
