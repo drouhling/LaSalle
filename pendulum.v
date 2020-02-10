@@ -400,7 +400,7 @@ have : forall t, Rmin 0 s <= t <= Rmax 0 s -> continuity_pt (V \o (sol p)) t.
   exact/continuity_pt_filterlim/ex_derive_continuous/Vsolp_deriv.
 move=> /(MVT_gen _ _ _ _ Vsol_derive) [t []].
 rewrite Rmin_left => //; rewrite Rmax_right => // - [tge0 tles].
-rewrite /funcomp sol0 Rminus_0_r; move/(Rmult_eq_compat_r (/ s)).
+rewrite /comp sol0 Rminus_0_r; move/(Rmult_eq_compat_r (/ s)).
 rewrite Rinv_r_simpl_l=> [VsolpsVpds|]; last exact/not_eq_sym/Rlt_not_eq.
 have : (V (sol p s) - V p) / s <= 0.
   rewrite /Rdiv VsolpsVpds -Ropp_mult_distr_l.
@@ -469,7 +469,7 @@ move=> limSKp tge0; have limSKsolp : limS sol K (sol p t) by apply: limSKinvar.
 have <- : Derive (V \o (sol (sol p t))) 0 = Derive (V \o (sol p)) t.
   rewrite -[t in RHS]Rplus_0_r.
   apply: derive_ext_ge0_shift; [apply: Rle_refl|apply: tge0|].
-  move=> ??; rewrite /funcomp -(solD sol0 solP Kinvar) //.
+  move=> ??; rewrite /comp -(solD sol0 solP Kinvar) //.
     by rewrite Rplus_comm.
   exact: subset_limSK_K.
 apply: (@stable_limS _ _ _ Kco _ sol0 solP sol_cont Kinvar V).

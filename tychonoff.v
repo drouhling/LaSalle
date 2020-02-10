@@ -182,7 +182,7 @@ Lemma cv_cluster (U : TopologicalSpace) (F : set (set U)) p :
   cluster F p <-> exists G : set (set U), ProperFilter G /\ cv G p /\ F `<=` G.
 Proof.
 move=> Fproper; split=> [clFp|[G [Gproper [cvGp sFG]]] A B]; last first.
-  by move=> /sFG GA /cvGp GB; apply/filter_ex/filter_and.
+  by move=> /sFG GA /cvGp GB; apply:filter_ex; apply: filter_and.
 exists ([set A | exists B, B `<=` A /\
   (\bigcup_(C in F) [set C `&` D | D in neighbour p]) B]); split.
   split.
@@ -628,7 +628,7 @@ have pFA : forall i, pF i (A i).
   move=> j; exists [set w : I -> T | forall i, A i (w i)]=> //.
   apply/funext=> p; apply/propext; split; first by move=> [w Aw <-]; apply: Aw.
   move=> Ajp; exists (fun k => if j == k then p else f k) => // k.
-  by case: (eqVneq j k)=> [<-|jnek]; [rewrite ifT|rewrite ifN].
+  by case: (eqVneq j k)=> [<-|].
 have cvpFA : forall i, {p | (A i `&` cv (pF i)) p}.
   move=> j; apply: constructive_indefinite_description.
   have [p [Ap clpFp]] : A j `&` cluster (pF j) !=set0.
@@ -693,8 +693,7 @@ split=> [Aop|].
   apply/funext=> g; apply/propext; split.
     move=> [e ge_bf] j _; exists e=> p bpjgp.
     exists (fun i => if j == i then p else g i) => //; apply: ge_bf => i.
-    case: (eqVneq j i)=> [<-|jnei]; first by rewrite ifT.
-    by rewrite ifN //; apply: ball_center.
+    by case: (eqVneq j i) => [<-|jnei] //; apply: ball_center.
   move=> Ibfg; have {Ibfg} Ibfg : forall j, {ej : posreal |
     ball (g j) ej `<=` pr j @` ball f (sval (Bop f Bf))}.
     by move=> j; apply: constructive_indefinite_description; apply: Ibfg.

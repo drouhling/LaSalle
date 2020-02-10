@@ -280,7 +280,7 @@ apply: nincr_lb_cvg.
       exact/Vsol'le0/Kinvar.
     rewrite -[t' in RHS]Rplus_0_r.
     apply: derive_ext_ge0_shift; [apply: Rle_refl|apply: t'ge0|].
-    by move=> ??; rewrite /funcomp -solD // Rplus_comm.
+    by move=> ??; rewrite /comp -solD // Rplus_comm.
   - by move=> t' t'ge0 _; apply: Vsol_ex_deriv.
 have: compact (V @` K) by apply: continuous_compact.
 move=> /compact_bounded [N hN].
