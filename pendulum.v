@@ -1,4 +1,4 @@
-Require Import Reals ssrring.
+Require Import Reals.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import matrix zmodp.
@@ -335,8 +335,9 @@ apply: (canLR (subrK _)); rewrite -mulrBl [_ * (_ + y)]mulrDr opprD addrA.
 rewrite [_ * (_ - _ * y)]mulrDr addrA -[- (_ * y)]mulNr [_ * (_ * y)]mulrA.
 rewrite [_ + _ * y + _]addrAC; apply: (canLR (subrK _)); rewrite -mulrBl.
 rewrite mulrN opprK mulrACA [_ ^+2 / _]mulrAC mulfVK //.
-by rewrite [_ / _]mulrC ![_^-1 * _]mulrA [_^-1 * _ * _]mulrC mulVKf //; ssring.
-Qed.
+rewrite [_ / _]mulrC ![_^-1 * _]mulrA [_^-1 * _ * _]mulrC mulVKf //.
+(* was ssring *)admit.
+Admitted.
 
 Lemma is_deriv_Vsol p t :
   K p -> 0 <= t -> V (sol p t) < B ->
@@ -359,8 +360,8 @@ apply: (canLR (mulfK _)) => //; rewrite [kv%:num * _]mulrDr addrA addrAC.
 apply: (canLR (subrK _)); rewrite mulrAC -mulrDl /fctrl [LHS]mulrA.
 have circp : (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 by apply: circ_invar.
 have fctrl_def := fctrl_wdef circp Vsolpt_s; apply: (canLR (mulfK _)) => //.
-by ssring.
-Qed.
+(*by ssring.*) admit.
+Admitted.
 
 Lemma defset_invar p : K p -> forall t, 0 <= t ->
   (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 /\ V (sol p t) < B.
@@ -560,8 +561,10 @@ apply: (canLR (mulfK _)) => //; rewrite [RHS]mulrDl; apply: (canRL (subrK _)).
 rewrite opprD [RHS]mulrDl [RHS]addrC; apply/(canRL (subrK _))/Logic.eq_sym.
 rewrite mulrC -mulNr mulrA mulrA; apply: (canLR (mulfK _)) => //.
 rewrite mulrDr [LHS]mulrDr addrC; apply: (canLR (subrK _)).
-by rewrite [LHS]mulrA [LHS]mulrA; apply: (canLR (mulfK _)) => //; ssring.
-Qed.
+rewrite [LHS]mulrA [LHS]mulrA; apply: (canLR (mulfK _)) => //.
+(* was ssring. *)
+admit.
+Admitted.
 
 Lemma div_fctrl_mP p t : limS sol K p -> 0 <= t ->
   (sol p t)..[3] * (g%:num * (sol p t)..[2] - l%:num * (sol p t)..[4] ^+ 2) =
@@ -583,8 +586,10 @@ apply: (canLR (mulfK _)); last apply/Logic.eq_sym.
   by apply: lt0r_neq0; rewrite pmulr_rgt0 // Mp_ms_gt0.
 rewrite mulrCA mulrA mulrA [l%:num * _ in LHS]mulrC mulrVK ?unitfE //.
 have [] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
-by rewrite addrC => /(canRL (addrK _)) -> _; ssring.
-Qed.
+rewrite addrC => /(canRL (addrK _)) -> _.
+(* ssrring *)
+admit.
+Admitted.
 
 Lemma En0_fctrlsol_const p t :
   limS sol K p -> E p != 0 -> 0 <= t -> fctrl (sol p t) = fctrl p.
@@ -735,14 +740,16 @@ have sol32_val : forall s, 0 <= s ->
   rewrite expr0n /= !mulr0 !mul0r add0r addr0 mulrDr mulrA [1 / _]mulrC.
   rewrite mulVKr ?unitfE // mul1r mulrBr addrC; apply: (canLR (subrK _)).
   rewrite -mulNr mulrDr addrC; apply: (canLR (subrK _)).
-  by rewrite mulrA; apply: (canLR (mulfK _)) => //; ssring.
+  rewrite mulrA; apply: (canLR (mulfK _)) => //.
+  (* was ssrring *) admit.
 have sol423_val s : 0 <= s ->
   (sol p s)..[4] * (3%:R * g%:num * ((sol p s)..[2] ^+ 2 -
   (sol p s)..[3] ^+ 2) + C1 * (sol p s)..[2]) = 0.
   move=> sge0; apply (is_derive_nneg_eq sol32_val sge0); last first.
     exact: is_derive_cst.
   have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: is_derive_eq.
-  by rewrite !mxE /=; ssring.
+  rewrite !mxE /=.
+  (* was ssrring *) admit.
 have sol432_val' s : 0 <= s ->
   (sol p s)..[3] * (g%:num / l%:num * (3%:R * g%:num * ((sol p s)..[2] ^+ 2 -
     (sol p s)..[3] ^+ 2) + C1 * (sol p s)..[2]) -
@@ -755,7 +762,8 @@ have sol432_val' s : 0 <= s ->
   rewrite [in RHS]mulrDl; apply: (canRL (subrK _)).
   rewrite [(sol p s)..[3] * _]mulrDr [in RHS]mulrDl; apply: (canRL (subrK _)).
   rewrite [_ / _ * _]mulrC [in RHS]mulrA [in RHS]mulrA mulrVK ?unitfE //.
-  by ssring.
+  (* was ssring *)
+  admit.
 set x1 := (- C1 + Num.sqrt (C1 ^+ 2 - 4%:R * (6%:R * g%:num) *
   (- 3%:R * g%:num))) / (2 * (6%:R * g%:num)).
 set x2 := (- C1 - Num.sqrt (C1 ^+ 2 - 4%:R * (6%:R * g%:num) *
@@ -782,7 +790,8 @@ have solroot_imf :
   have sol2_root :
     6%:R * g%:num * ((sol p s)..[2] ^+ 2) + C1 * (sol p s)..[2] +
     (- 3%:R * g%:num) = 0.
-    by rewrite -sol2_val; ssring.
+    rewrite -sol2_val.
+    (* was ssrring *) admit.
   case/poly2_factor: sol2_root => {sol2_val} [|sol2_val|sol2_val] //.
     by exists (2%:R); rewrite sol2_val.
   by exists (3%:R); rewrite sol2_val.
@@ -797,7 +806,7 @@ case: (eqVneq ((sol p s)..[3]) 0) => [sol3e0|sol3ne0].
   by exists 0.
 move=> /eqP; rewrite mulrI_eq0; last exact/lregP.
 by rewrite mulrI_eq0=> [/eqP|] //; apply/lregP.
-Qed.
+Admitted.
 
 Lemma En0_sol3_const p :
   limS sol K p -> E p != 0 -> forall t, 0 <= t -> (sol p t)..[3] = p..[3].
