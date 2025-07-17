@@ -134,7 +134,7 @@ rewrite -circq.
 rewrite /ball/=.
 rewrite opprD addrACA; apply: le_lt_trans (ler_norm_add _ _) _.
 by rewrite (splitr e%:num) ltr_add //; [apply/p2e1_sp2he|apply/p3e2_sp3he];
-  apply: ball_ler (pme12_q _ _); rewrite le_minl lexx // orbC.
+  apply: le_ball (pme12_q _ _); rewrite le_minl lexx // orbC.
 Qed.
 
 Lemma preimV_lek0_closed : closed (V @^-1` (<= k0 : _ -> _)).
@@ -335,7 +335,8 @@ Proof.
 move=> Kp /= t tge0; have [circp _] := Kp; rewrite -circp -[in RHS](sol0 p).
 pose f s := (sol p s)..[2] ^+ 2 + (sol p s)..[3] ^+ 2; rewrite -!/(f _).
 (* BUG in unification *)
-apply (@eq0_derive1_cst (f : R^o -> R^o) 0 t); last by rewrite inE/= lexx tge0.
+apply (@eq0_derive1_cst (f : R^o -> R^o) 0 t); last first.
+  by rewrite in_itv/= lexx tge0.
 move=> s s0t; have sge0 : s >= 0 by rewrite (itvP s0t).
 have [_ /(_ _ sge0) dsol] := sol_is_sol sol0 solP Kp.
 apply: is_derive_eq.
@@ -431,7 +432,7 @@ have Vsolpinf_geB : B <= V (sol p (inf A)).
   apply: lb_le_inf An0 _; apply/lbP => s /andP [sge0 Vsolps_geB].
   rewrite leNgt; apply/negP => ltsinfphe; have leinfs : inf A <= s.
     apply: inf_lower_bound => //.
-    by rewrite /A sge0 Vsolps_geB.
+    by rewrite /A/= sge0 Vsolps_geB.
   suff /infe_Vsolp : ball (inf A) e%:num s.
     rewrite /ball/= distrC => /(le_lt_trans (ler_norm _)).
     by rewrite ltNge => /negP; apply; rewrite ler_sub.
@@ -557,7 +558,7 @@ have /@derive_val <- := df; have /@derive_val <- := dg.
 apply: subr0_eq; rewrite -deriveB // /derive cvg_at_rightE; last first.
   by rewrite -[cvg _]/(derivable _ _ _).
 apply: cvg_map_lim => A A0.
-  rewrite -close_cluster.
+  rewrite -closeEnbhs.
   by rewrite norm_closeE.
 rewrite !near_simpl; near=> h.
 rewrite /= -![(_ - _ : _ -> _) _]/(_ - _) !feg //.
@@ -577,7 +578,7 @@ Lemma sol0_const p t : limS sol K p -> 0 <= t -> (sol p t)..[0] = p..[0].
 Proof.
 move=> limSKp tge0; rewrite -[p in RHS]sol0.
 apply (@eq0_derive1_cst (fun s => (sol p s)..[0]) 0 t); last first.
-  by rewrite inE/= lexx tge0.
+  by rewrite in_itv/= lexx tge0.
 move=> s /andP [sge0 _]; have /subset_limSK_K Kp := limSKp.
 have [_ /(_ _ sge0) /(is_derive_component 0) dsol0] := sol_is_sol sol0 solP Kp.
 by apply: DeriveDef => //; rewrite derive_val mxE /= sol1_eq0.
@@ -587,7 +588,7 @@ Lemma Esol_const p t : limS sol K p -> 0 <= t -> (E \o sol p) t = E p.
 Proof.
 move=> limSKp tge0; rewrite -[p in RHS]sol0.
 apply (@eq0_derive1_cst (E \o sol p) 0 t); last first.
-  by rewrite inE/= lexx tge0.
+  by rewrite in_itv/= lexx tge0.
 move=> s /andP [sge0 _]; have /subset_limSK_K Kp := limSKp.
 have dEsol := is_derive_Esol Kp sge0; apply: DeriveDef => //.
 by rewrite derive_val sol1_eq0 // mul0r.
@@ -697,7 +698,7 @@ have imgfr : (g @` setT) fr.
   by have /finim_f [i] := lexx (0 : R); exists i.
 have imgn0 : nonempty img.
   exists fr.
-  by rewrite /img ltflr andTb; apply/asboolP.
+  by rewrite /img/= ltflr andTb; apply/asboolP.
 have infimg : has_inf img.
   by split=> //; exists fl; apply/lbP => ? /andP [/ltW].
 have [] := @IVT _ f _ _ ((fl + inf img) / 2) tge0.
