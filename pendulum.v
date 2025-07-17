@@ -1,4 +1,3 @@
-Require Import Reals.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
@@ -12,13 +11,25 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Import GRing.Theory Num.Def Num.Theory Order.POrderTheory Order.TotalTheory.
 
+Import numFieldTopology.Exports.
+
 Local Open Scope classical_set_scope.
 Local Open Scope ring_scope.
 
 Notation "p ..[ i ]" := (p 0 (inZp i)) (at level 10).
 
-Section System.
+Lemma ge0_expr_ndecr (R : realDomainType) n (x y : R) :
+  0 <= x <= y -> x ^+ n <= y ^+ n.
+Proof.
+move=> /andP [xge0 yge0]; elim: n => [|n ihn]; first by rewrite !expr0.
+by rewrite !exprS ler_pmul // exprn_ge0.
+Qed.
 
+Lemma mul2r (R : ringType) (x : R) : 2 * x = x + x.
+Proof. by rewrite -mulr2n mulr_natl. Qed.
+
+Section System.
+Context {R : realType}.
 Parameter m M l g : {posnum R}.
 
 Variable ke kv kx kd : {posnum R}.
@@ -184,11 +195,11 @@ Grab Existential Variables. all: end_near. Qed.
 Lemma K_bounded : bounded_set K.
 Proof.
 suff : \forall M \near +oo, forall p, K p -> forall i, `|p ord0 i| < M.
-  rewrite /bounded; apply: filter_app; near=> M.
+  rewrite /bounded_set; apply: filter_app; near=> M.
   move=> Kbnd /= p /Kbnd ltpM.
   rewrite /normr/=.
   rewrite mx_normrE.
-  apply/BigmaxBigminr.bigmaxr_lerP; split => //.
+  apply/bigmax_lerP; split => //.
     near: M.
     exists 0%R; split.
       by rewrite realE lexx.
@@ -245,11 +256,9 @@ have : E p < Num.sqrt (2 * B / ke%:num).
   by rewrite -[V _]addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
 apply: le_lt_trans; apply: ler_add; last first.
   rewrite -mulrN opprD ler_wpmul2l //.
-    by rewrite !RmultE.
   rewrite ler_add2r ler_oppl.
   rewrite ler_paddl // (le_trans (ler_norm _)) // normrN.
   rewrite -sqrtr_sqr.
-  rewrite (_ : 1%coqR = 1)//.
   by rewrite -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
 rewrite mulrDr [1 / 2 * _ + _]addrC -addrA [1 / 2 * _]mulrCA mul1r mulrA.
 rewrite (expr2 l%:num) ler_add2l; apply: ler_paddl.
@@ -270,13 +279,6 @@ Proof. exact: bounded_closed_compact K_bounded K_closed. Qed.
 
 Lemma Mp_ms_gt0 (p : U) : 0 < M%:num + m%:num * (p..[3] ^+ 2).
 Proof. by rewrite ltr_spaddl // pmulr_rge0 // sqr_ge0. Qed.
-
-Lemma ge0_expr_ndecr (R : realDomainType) n (x y : R) :
-  0 <= x <= y -> x ^+ n <= y ^+ n.
-Proof.
-move=> /andP [xge0 yge0]; elim: n => [|n ihn]; first by rewrite !expr0.
-by rewrite !exprS ler_pmul // exprn_ge0.
-Qed.
 
 Lemma E_small p : V p < B -> `|E p| < kv%:num / (ke%:num * (M%:num + m%:num)).
 Proof.
@@ -340,11 +342,11 @@ apply (@eq0_derive1_cst (f : R^o -> R^o) 0 t); last first.
 move=> s s0t; have sge0 : s >= 0 by rewrite (itvP s0t).
 have [_ /(_ _ sge0) dsol] := sol_is_sol sol0 solP Kp.
 apply: is_derive_eq.
-by rewrite !mxE /= [_ *: (_ * _)]mulrCA -!mulrDr addrC mulNr subrr.
+rewrite 2!mxE/=.
+rewrite /GRing.scale/=.
+rewrite mulrCA.
+by rewrite -!mulrDr addrC mulNr subrr.
 Qed.
-
-Lemma mul2r (R : ringType) (x : R) : 2 * x = x + x.
-Proof. by rewrite -mulr2n mulr_natl. Qed.
 
 Lemma is_derive_Esol p t :
   K p -> 0 <= t -> is_derive (t : R^o) 1 (E \o (sol p) : _ -> R^o)
@@ -506,7 +508,7 @@ Qed.
 Lemma limSKinvar : is_invariant sol (limS sol K).
 Proof.
 move=> p limSKp t tge0.
-exact: (@invariant_limS _ _ _ K_compact _ sol0 solP sol_cont Kinvar).
+exact: (@invariant_limS _ _ _ _ K_compact _ sol0 solP sol_cont Kinvar).
 Qed.
 
 Lemma subset_limSK_K : limS sol K `<=` K.
@@ -531,7 +533,6 @@ have -> : derive1 (V \o sol p : _ -> R^o) t =
   have Ksolpt : K (sol p t) by apply: subset_limSK_K.
   have dVsolt' := is_derive_Vsol Ksolpt (lexx _); rewrite derive1E derive_val.
   rewrite -(solD sol0 solP Kinvar) //.
-  rewrite RplusE.
   by rewrite add0r.
 apply: (stable_limS K_compact sol0 solP sol_cont Kinvar (V:=V)) limSKsolp.
 - move=> q Kq; have /(_ q) := V_continuous; apply: cvg_trans.

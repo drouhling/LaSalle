@@ -1,4 +1,3 @@
-Require Import Reals.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
@@ -74,7 +73,9 @@ have : A `&` (cluster F `\` B^°) = set0.
   suff -> : cluster F `\` B^° = set0 by rewrite setI0.
   rewrite setD_eq0 => p clFp.
   by rewrite /interior -nbhs_ballE; exists e => // ??; exists p.
-rewrite clusterE [_ `\` _]setI_bigcapl // setIC setI_bigcapl // => IFBoA0.
+rewrite clusterE.
+rewrite -[_ `\` _]bigcapIl // setIC.
+rewrite -bigcapIl // => IFBoA0.
 set f := fun C => closure C `&` ~` B^° `&` A.
 have [G sGF IGBoA0] : exists2 G : {fset (set U)},
   {subset G <= F} & \bigcap_(C in [set C | C \in G]) f C = set0.
@@ -94,7 +95,7 @@ have Gn0 : [set C | C \in G] !=set0.
 move: IGBoA0; have -> : \bigcap_(C in [set C | C \in G]) f C =
   \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` B^°).
   by rewrite predeqE => a; split=> IGBoAa ? /IGBoAa [[]].
-rewrite -setI_bigcapl // setD_eq0 => sIGABo.
+rewrite bigcapIl // setD_eq0 => sIGABo.
 suff : F B^° by apply: filterS => ?; apply: nbhs_singleton.
 apply: filterS sIGABo _; apply: filter_bigI => C /sGF; rewrite in_setE => FC.
 by apply: filterI FA _; apply: filterS (@subset_closure _ C) _.
@@ -169,7 +170,7 @@ End PositiveLimitingSet.
 Lemma bounded_plim (K : realFieldType) (V : normedModType K) (y : K -> V) :
   bounded_set (y @` (>= 0)%R) -> bounded_set (cluster (y @ +oo%R)).
 Proof.
-rewrite /bounded => - [N [Nreal ybndN]].
+rewrite /bounded_set => - [N [Nreal ybndN]].
 wlog Ngt0 : N Nreal ybndN / (0 < N)%R.
   move=> bnd_plim; apply: (bnd_plim (maxr N 1%R)); last first.
     by rewrite lt_maxr orbC ltr01.
@@ -208,8 +209,30 @@ have : G (A `&` f @^-1` B) by exists B.
 by move=> /clsGp /(_ p_Cf) [q [[Aq ?] /(_ Aq)]]; exists (f q).
 Qed.
 
-Section DifferentialSystem.
+(* to mathcomp/analysis *)
+Lemma nearN (R : realFieldType) (P : set R) :
+  (\forall x \near (0%R : R^o), P x) = (\forall x \near (0%R : R^o), P (- x)%R).
+Proof.
+rewrite propeqE; split.
+  move/(@nbhs_ballP _ [the pseudoMetricType _ of R^o]).
+  move=> [e egt0 seP]; exists e => // x.
+  move=> ex.
+  apply: seP.
+  move: ex.
+  by rewrite /ball/= /ball_/= opprK !add0r normrN.
+move/(@nbhs_ballP _ [the pseudoMetricType _ of R^o]).
+move=> [e egt0 seP]; exists e => // x.
+move=> ex.
+rewrite -(opprK x).
+apply: seP.
+move: ex.
+by rewrite /ball/= /ball_/= opprK !add0r normrN.
+Qed.
 
+Import numFieldTopology.Exports.
+
+Section DifferentialSystem.
+Context {R : realType}.
 Variable U : normedModType R.
 Let hU : hausdorff U := @norm_hausdorff _ U.
 
@@ -245,34 +268,13 @@ Hypothesis Kinvar : is_invariant K.
 Definition shift_sol p t0 t :=
   (if t >= 0 then sol p (t + t0) else 2 *: (sol p t0) - (sol p (- t + t0)))%R.
 
-(* to mathcomp/analysis *)
-Lemma nearN (R : realFieldType) (P : set R) :
-  (\forall x \near (0%R : R^o), P x) = (\forall x \near (0%R : R^o), P (- x)%R).
-Proof.
-rewrite propeqE; split.
-  move/(@nbhs_ballP _ [the pseudoMetricType _ of R^o]).
-  move=> [e egt0 seP]; exists e => // x.
-  move=> ex.
-  apply: seP.
-  move: ex.
-  by rewrite /ball/= /ball_/= opprK !add0r normrN.
-move/(@nbhs_ballP _ [the pseudoMetricType _ of R^o]).
-move=> [e egt0 seP]; exists e => // x.
-move=> ex.
-rewrite -(opprK x).
-apply: seP.
-move: ex.
-by rewrite /ball/= /ball_/= opprK !add0r normrN.
-Qed.
-
 Lemma sol_shift p (t0 : R^o) : K p -> (0 <= t0)%R -> is_sol (shift_sol p t0).
 Proof.
 move=> Kp t0ge0; split=> [t tlt0|t tge0].
   rewrite /shift_sol leNgt tlt0/= lexx/=.
   rewrite ltW ?oppr_gt0//.
   rewrite [X in _ = (2 *: sol p X - _)%R](_ : _ = t0)//.
-  set tmp := (0 + t0)%R.
-  by rewrite RplusE add0r.
+  by rewrite add0r.
 suff dshift : (shift_sol p t0) \o shift t = (cst (shift_sol p t0 t) +
   (fun h : R^o => h *: F (shift_sol p t0 t)))%R +o_ (0%R : R^o) (id : R^o -> R^o).
 (*  have dshiftE : 'd (shift_sol p t0) (t : R^o) =
@@ -326,7 +328,6 @@ move: tge0; rewrite le_eqVlt orbC => /orP [tgt0|/eqP teq0].
   by rewrite sub0r ler_norm.
 rewrite -teq0.
 rewrite shift0.
-rewrite RplusE.
 rewrite add0r.
 apply/eqaddoP => _ /posnumP[e]; near=> s.
 rewrite -![(_ + _ : _ -> _)%R _]/(_ + _)%R /= -[t0]add0r teq0.
@@ -357,7 +358,6 @@ Lemma solD p t0 t :
 Proof.
 move=> Kp t0ge0 tge0; have /sol_shift /(_ t0ge0) /solP := Kp.
 rewrite [shift_sol _ _ _]/shift_sol lexx.
-rewrite RplusE.
 rewrite add0r.
 move=> <-; last exact: Kinvar.
 by rewrite /shift_sol tge0.
