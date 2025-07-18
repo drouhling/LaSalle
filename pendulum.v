@@ -33,7 +33,7 @@ Parameter m M l g : {posnum R}.
 
 Variable ke kv kx kd : {posnum R}.
 
-Let U := 'rV[R]_5.
+Notation U := 'rV[R]_5.
 
 (* p = (x, x', cos theta, sin theta, theta') *)
 Definition E (p : U) :=
@@ -290,7 +290,7 @@ rewrite ltr_pdivrMr // mulrC -ltr_pdivlMr // (lt_le_trans Vp_s) //.
 rewrite -mulrA mulrCA mulrA; apply: ler_pM => //; apply: ler_pM => //.
 apply/ge0_expr_ndecr/andP; split; last first.
   by rewrite ge_min/= lexx.
-by rewrite le_minr; apply/andP; split.
+by rewrite le_min; apply/andP; split.
 Qed.
 
 Lemma fctrl_wdef (p : U) : (p..[2] ^+ 2) + (p..[3] ^+ 2) = 1 -> V p < B ->
@@ -447,7 +447,7 @@ have Vsolpinf_geB : B <= V (sol p (inf A)).
     by rewrite leNgt => /negP; apply; rewrite ltrDl.
   apply: lb_le_inf An0 _; apply/lbP => s /andP [sge0 Vsolps_geB].
   rewrite leNgt; apply/negP => ltsinfphe; have leinfs : inf A <= s.
-    apply: inf_lb => //.
+    apply: inf_lbound => //.
       by case: infA.
     by rewrite /A/= sge0 Vsolps_geB.
   suff /infe_Vsolp : ball (inf A) e%:num s.
@@ -461,7 +461,7 @@ have Vsol_drvbl t : t \in `]0, (inf A)[ ->
   move=> t0inf; apply: is_deriv_Vsol => //; first by rewrite (itvP t0inf).
   rewrite ltNge; apply/negP => Vsolpt_geB; suff : inf A <= t.
     by rewrite leNgt => /negP; apply; rewrite (itvP t0inf).
-  apply: inf_lb => //.
+  apply: inf_lbound => //.
     by case: infA.
   apply/andP; split=> //.
   by rewrite (itvP t0inf).
@@ -694,7 +694,7 @@ have Amin : \big[minr/t]_(s <- enum_fset A) s \in A.
   by apply: ihl => r lr; apply: inA; rewrite inE orbC lr.
 suff -> : inf [set t | t \in A] = \big[minr/t]_(s <- enum_fset A) s by [].
 apply/eqP; rewrite eq_le; apply/andP; split.
-  apply: inf_lb => //.
+  apply: inf_lbound => //.
   by case: infA.
 apply: lb_le_inf; first by have [] := infA.
 apply/lbP => s As; have : s \in enum_fset A by [].
@@ -739,12 +739,12 @@ have [] := @IVT _ f _ _ ((fl + inf img) / 2) tge0.
     rewrite ler_pdivlMr // mulrC mul2r lerD2l.
     by apply: lb_le_inf imgn0 _; apply/lbP => ? /andP [/ltW].
   rewrite ler_pdivrMr // mulrC mul2r lerD //; first exact: ltW.
-  apply: inf_lb => //.
+  apply: inf_lbound => //.
     by case: infimg.
   by apply/andP; split=> //; apply/asboolP.
 move=> s s0t fsemid; suff ltfl_inf : fl < inf img.
   have : inf img <= (fl + inf img) / 2.
-    apply: inf_lb.
+    apply: inf_lbound.
       by case: infimg.
     apply/andP; split; last first.
       have /finim_f [i] : 0 <= s by rewrite (itvP s0t).
@@ -902,7 +902,7 @@ have /sol432_val' := sge0.
 rewrite sol4e0 expr0n /= mul0r subr0.
 case: (eqVneq ((sol p s)..[3]) 0) => [sol3e0|sol3ne0].
   move=> _; move: circsol; rewrite sol3e0 expr0n /= addr0.
-  rewrite -(expr1n [ringType of R] 2) => /eqP; rewrite eqf_sqr=> /orP [] /eqP->.
+  rewrite -(expr1n R 2) => /eqP; rewrite eqf_sqr=> /orP [] /eqP->.
     by exists 1.
   by exists 0.
 move=> /eqP; rewrite mulrI_eq0; last exact/lregP.
@@ -973,7 +973,7 @@ Lemma En0_sol2_eq1 p t :
 Proof.
 move=> limSKp Epn0 tge0.
 have [] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
-rewrite En0_sol3_eq0 // expr0n /= addr0 -{1}(expr1n [ringType of R] 2).
+rewrite En0_sol3_eq0 // expr0n /= addr0 -{1}(expr1n R 2).
 move/eqP; rewrite eqf_sqr => /orP [] /eqP // sol2_eqN1 _.
 suff : `|E (sol p t)| < 2 * m%:num * g%:num * l%:num.
   rewrite /E sol1_eq0 // En0_sol4_eq0 // expr0n /= !mulr0 !addr0 mulr0 add0r.

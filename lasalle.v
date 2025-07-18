@@ -20,7 +20,7 @@ Context {R : numDomainType} {M : pseudoMetricType R}.
 
 Definition ball_set (A : set M) e := \bigcup_(p in A) ball p e.
 
-HB.instance Definition _ := isPointed.Build (set M) [set point].
+(*HB.instance Definition _ := isPointed.Build (set M) [set point].*)
 
 HB.instance Definition _ := isFiltered.Build M (set M) (nbhs_ball_ ball_set).
 
@@ -28,7 +28,7 @@ End pseudoMetricType_numDomainType.
 
 Section PositiveLimitingSet.
 Variable R : realFieldType.
-Variable U : pseudoMetricType R.
+Variable U : pseudoPMetricType R.
 
 Definition pos_limit_set (y : R -> U) :=
   \bigcap_(eps in [set e | 0 < e]%R) \bigcap_(T in [set T | 0 < T]%R)
@@ -437,7 +437,7 @@ rewrite distrC ger0_norm.
   rewrite ltrBlDl.
   by apply: le_lt_trans ltftinfe; apply: fnincr; rewrite tge0 (ltW ltts).
 rewrite subr_ge0.
-apply: inf_lb => //.
+apply: inf_lbound => //.
   by case: imf_inf.
 rewrite in_setE; apply: imageP.
 by apply: ltW; apply: le_lt_trans ltts.
