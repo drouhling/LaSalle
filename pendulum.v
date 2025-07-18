@@ -2,7 +2,8 @@ From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import matrix zmodp.
-From mathcomp Require Import boolp reals Rstruct classical_sets posnum.
+From mathcomp Require Import mathcomp_extra.
+From mathcomp Require Import boolp reals Rstruct classical_sets posnum functions.
 From mathcomp Require Import topology normedtype prodnormedzmodule landau derive.
 Require Import lasalle.
 
@@ -69,7 +70,7 @@ Proof.
 have comp_lin : linear (fun q : 'rV[R]_n.+1 => q..[i] : R^o).
   by move=> ???; rewrite !mxE.
 have comp_cont : continuous (fun q : 'rV[R]_n.+1 => q..[i] : R^o).
-  move=> q A [_/posnumP[e] Ae] /=; apply/nbhs_ballP; exists e%:num => //.
+  move=> q A [_/posnumP[e] Ae] /=; apply/nbhs_ballP; exists e%:num => //=.
   by move=> r /(_ ord0) /(_ (inZp i)) /Ae.
 apply: DiffDef; first exact: (@linear_differentiable _ _ _ (Linear comp_lin)).
 by rewrite (@diff_lin _ _ _ (Linear comp_lin)).
@@ -134,13 +135,18 @@ Proof.
 move=> p clcircp.
 apply/close_eq => //=; first exact: Rhausdorff.
 rewrite (@ball_close _ [normedModType R of R^o]) => e /=.
-have /expr_continuous [_/posnumP[e1] p2e1_sp2he] :=
-  nbhsx_ballx (p..[2] ^+ 2) (e%:num / 2)%:pos.
-have /expr_continuous [_ /posnumP[e2] p3e2_sp3he] :=
-  nbhsx_ballx (p..[3] ^+ 2) (e%:num / 2)%:pos.
+have : nbhs (p ..[ 2] ^+ 2) (ball (p ..[ 2] ^+ 2) ((e%:num / 2)%:pos)%:num).
+  by apply: nbhsx_ballx.
+move=> /expr_continuous [_/posnumP[e1] p2e1_sp2he].
+have : nbhs (p ..[ 3] ^+ 2) (ball (p ..[ 3] ^+ 2) ((e%:num / 2)%:pos)%:num).
+  by apply: nbhsx_ballx.
+move=> /expr_continuous [_ /posnumP[e2] p3e2_sp3he].
 have [q [circq pme12_q]] :
   [set p : U | p..[2] ^+ 2 + p..[3] ^+ 2 = 1] `&`
-  ball p (minr e1%:num e2%:num) !=set0 by apply/clcircp/nbhsx_ballx.
+  ball p (minr e1%:num e2%:num) !=set0.
+   apply/clcircp.
+   rewrite /minr.
+   by case: ifPn => // ?; apply/nbhsx_ballx.
 rewrite -circq.
 rewrite /ball/=.
 rewrite opprD addrACA; apply: le_lt_trans (ler_norm_add _ _) _.
@@ -174,13 +180,11 @@ suff ptoinfty : (fun x => a * (x ^+ 2) - (b * `|x|) - c) @ +oo --> +oo.
 move=> A [M [Mreal sgtMA]]; rewrite !near_simpl; near=> x.
 have lt0x : 0 < x.
   near: x.
-  exists 0; split => //.
-  by rewrite realE lexx.
+  by exists 0; split => //.
 rewrite ger0_norm ?ltW //; apply: sgtMA.
 rewrite ltr_subr_addr expr2 mulrA -mulrBl; apply: le_lt_trans (ler_norm _) _.
 rewrite -[ `|_|%R]sqr_sqrtr // expr2; apply: ltr_pmul; last 1 first.
-- near: x; exists (Num.sqrt `|M + c|); split => //.
-  by rewrite realE sqrtr_ge0.
+- by near: x; exists (Num.sqrt `|M + c|); split => //.
 - exact: sqrtr_ge0.
 - exact: sqrtr_ge0.
 rewrite ltr_subr_addr -ltr_pdivr_mull //; near: x.
@@ -188,9 +192,8 @@ exists (a^-1 * (Num.sqrt `|M + c| + b)); split => //.
 rewrite realM//.
   by rewrite realV// realE (ltW agt0).
 rewrite realD//.
-  by rewrite realE sqrtr_ge0.
 by rewrite realE; apply: le_total.
-Grab Existential Variables. all: end_near. Qed.
+Unshelve. all: by end_near. Qed.
 
 Lemma K_bounded : bounded_set K.
 Proof.
@@ -217,30 +220,28 @@ suff : \forall M \near +oo, forall p, K p -> `| p..[0] | < M /\
 have K1bnd : \forall M \near +oo, forall p, K p -> `| p..[1] | < M.
   near=> M => p [_ Vps].
     suff /lt_trans : `| p..[1] | < Num.sqrt (2 * B / kv%:num).
-    apply; near: M; exists (Num.sqrt (2 * B / kv%:num)); split => //.
-    by rewrite realE sqrtr_ge0.
-  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+    by apply; near: M; exists (Num.sqrt (2 * B / kv%:num)); split => //.
+  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div; last first.
+    by rewrite mulr0 /B/=.
   apply: le_lt_trans k0_valid; apply: le_trans Vps.
   by rewrite [V _]addrAC ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
 apply: filter_app (K1bnd); near=> M.
 move=> K1ltM p Kp; have [circp Vps] := Kp; split.
   suff /lt_trans : `| p..[0] | < Num.sqrt (2 * B / kx%:num).
-    apply; near: M; exists (Num.sqrt (2 * B / kx%:num)); split => //.
-    by rewrite realE sqrtr_ge0.
-  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+    by apply; near: M; exists (Num.sqrt (2 * B / kx%:num)); split => //.
+  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div; last first.
+    by rewrite mulr0 /B.
   apply: le_lt_trans k0_valid; apply: le_trans Vps.
   by rewrite ler_addr addr_ge0 // pmulr_rge0 // sqr_ge0.
 split; first exact: K1ltM; split.
   suff /le_lt_trans : `| p..[2] | <= 1.
     apply.
-    near: M; exists 1; split => //.
-    by rewrite realE ler01.
+    by near: M; exists 1; split => //.
   by rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
 split.
   suff /le_lt_trans : `| p..[3] | <= 1.
     apply.
-    near: M; exists 1; split => //.
-    by rewrite realE ler01.
+    by near: M; exists 1; split => //.
   by rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addr sqr_ge0.
 move: p Kp {circp Vps}; near: M; rewrite /= !near_simpl.
 have [M1 [M1real sgtM1gtK1]] := K1bnd.
@@ -251,7 +252,8 @@ apply: filter_app; near=> M => sEsltM p Kp; have [circp Vps] := Kp.
 apply: sEsltM.
 have : E p < Num.sqrt (2 * B / ke%:num).
   apply: le_lt_trans (ler_norm _) _.
-  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div.
+  rewrite -sqrtr_sqr ltr_sqrt // mulrAC -ltr_pdivr_mull // invf_div; last first.
+    by rewrite mulr0 /B.
   apply: le_lt_trans k0_valid; apply: le_trans Vps.
   by rewrite -[V _]addrA ler_addl addr_ge0 // pmulr_rge0 // sqr_ge0.
 apply: le_lt_trans; apply: ler_add; last first.
@@ -261,6 +263,7 @@ apply: le_lt_trans; apply: ler_add; last first.
   rewrite -sqrtr_sqr.
   by rewrite -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
 rewrite mulrDr [1 / 2 * _ + _]addrC -addrA [1 / 2 * _]mulrCA mul1r mulrA.
+rewrite /=.
 rewrite (expr2 l%:num) ler_add2l; apply: ler_paddl.
   by rewrite pmulr_rge0 // pmulr_rge0 // sqr_ge0.
 rewrite -mulrN -!mulrA ler_wpmul2l // ler_wpmul2l // !mulrN ler_oppl.
@@ -272,7 +275,7 @@ rewrite !mulrA ler_wpmul2r // ler_pmul //.
   by rewrite ltr_addl.
 have /(le_trans _) : 1 <= `|M1| + 1 by rewrite ler_addr.
 by apply; rewrite -sqrtr_sqr -sqrtr1 ler_sqrt // -circp ler_addl sqr_ge0.
-Unshelve. all: end_near. Grab Existential Variables. all: end_near. Qed.
+Unshelve. all: by end_near. Qed.
 
 Lemma K_compact : compact K.
 Proof. exact: bounded_closed_compact K_bounded K_closed. Qed.
@@ -325,10 +328,20 @@ Lemma eq0_derive1_cst (f : R^o -> R^o) (a b : R) :
   forall t, t \in `[a, b] -> f t = f a.
 Proof.
 move=> f'eq0 t tab; apply/eqP; rewrite eq_le; apply/andP; split.
-  by apply: (@ler0_derive1_nincr _ _ a b) => //; rewrite ?(itvP tab) //;
-    move=> ? /f'eq0 // df; rewrite derive1E derive_val.
-by apply: (@le0r_derive1_ndecr _ _ a b) => //; rewrite ?(itvP tab) //;
-  move=> ? /f'eq0 // df; rewrite derive1E derive_val.
+  apply: (@ler0_derive1_nincr _ _ a b) => //; rewrite ?(itvP tab) //;[
+    by move=> x /subset_itv_oo_cc /f'eq0 // df; rewrite derive1E derive_val..|].
+  apply: continuous_subspaceT => x.
+  rewrite inE/= => /f'eq0.
+  move=> /(@ex_derive _ [the normedModType R of R^o]).
+  move=> /derivable1_diffP /differentiable_continuous.
+  exact.
+apply: (@le0r_derive1_ndecr _ _ a b) => //; rewrite ?(itvP tab) //;[
+  by move=> x /subset_itv_oo_cc /f'eq0 // df; rewrite derive1E derive_val..|].
+apply: continuous_subspaceT => x.
+rewrite inE/= => /f'eq0.
+move=> /(@ex_derive _ [the normedModType R of R^o]).
+move=> /derivable1_diffP /differentiable_continuous.
+exact.
 Qed.
 
 Lemma circ_invar p :
@@ -448,11 +461,14 @@ have Vsol_drvbl t : t \in `]0, (inf A)[ ->
     by rewrite leNgt => /negP; apply; rewrite (itvP t0inf).
   apply: inf_lower_bound => //; apply/andP; split=> //.
   by rewrite (itvP t0inf).
-have : {in `[0, (inf A)], continuous (V \o sol p)}.
+have : {in `[0, (inf A)]%classic, continuous (V \o sol p)}.
   move=> t t0inf; suff /differentiable_continuous :
     differentiable (V \o sol p : R^o -> R^o) t by [].
-  by apply/derivable1_diffP/Vsolp_drvbl; rewrite (itvP t0inf).
-move=> /(MVT infge0 Vsol_drvbl) [t t0inf].
+  apply/derivable1_diffP/Vsolp_drvbl.
+  rewrite inE/= in t0inf.
+  by rewrite (itvP t0inf).
+move/continuous_subspaceT.
+move=> /(MVT_segment infge0)[t t0inf].
 rewrite /comp sol0 subr0 => dVsol.
 have infgt0 : 0 < inf A.
   rewrite lt_def; apply/andP; split=> //.
@@ -481,10 +497,18 @@ apply: le_trans Vp_s; rewrite -{2}[p]sol0.
 have Vsol_deriv : forall s, s \in `[0, t] ->
   is_derive (s : R^o) 1 (V \o sol p : _ -> R^o)
   (- kd%:num * (sol p s)..[1] ^+ 2) by move=> s /andP [/(is_derive_Vsol Kp)].
-apply: (@ler0_derive1_nincr _ (V \o sol p) 0 t);[idtac|idtac|by [] |by [] |by []].
-  by move=> ? /Vsol_deriv.
-move=> s /Vsol_deriv dVsols; rewrite derive1E derive_val.
-by rewrite !mulNr oppr_le0 pmulr_rge0 // sqr_ge0.
+apply: (@ler0_derive1_nincr _ (V \o sol p) 0 t);[| | |by [] |by [] |by []].
+  move=> x /subset_itv_oo_cc /Vsol_deriv.
+  by apply: (@ex_derive _ [the normedModType R of R^o]).
+  move=> x /subset_itv_oo_cc /Vsol_deriv.
+  rewrite derive1E.
+  case => _ ->.
+  by rewrite mulr_le0_ge0// sqr_ge0.
+apply: continuous_subspaceT => x.
+rewrite inE/= => /Vsol_deriv.
+move=> /(@ex_derive _ [the normedModType R of R^o]).
+move=> /derivable1_diffP /differentiable_continuous.
+exact.
 Qed.
 
 Definition homoclinic_orbit : set U := [set p : U | p..[0] = 0 /\ p..[1] = 0 /\
@@ -500,7 +524,8 @@ rewrite predeqE => p; split.
   rewrite !mulr0 !mul0r addr0 add0r mulrA [_ / _ * _]mulrA -mulrN opprB.
   by rewrite [_ * _ * g%:num]mulrAC.
 move=> [p0eq0 [p1eq0 Epeq0]]; split=> //; split=> //.
-apply: subr0_eq; rewrite -Epeq0 /E p1eq0 expr0n /=.
+apply: subr0_eq.
+rewrite -[RHS]Epeq0 /E p1eq0 expr0n /=.
 rewrite !mulr0 !mul0r addr0 add0r [in RHS] mulrA [_ / _ * _ in RHS]mulrA -mulrN.
 by rewrite opprB [_ * _ * g%:num]mulrAC.
 Qed.
@@ -564,8 +589,8 @@ apply: cvg_map_lim => A A0.
 rewrite !near_simpl; near=> h.
 rewrite /= -![(_ - _ : _ -> _) _]/(_ - _) !feg //.
   by rewrite !subrr scaler0; apply: nbhs_singleton.
-by rewrite addr_ge0 // [_%:A]mulr1 ltW //; near: h; exists 1.
-Grab Existential Variables. all: end_near. Qed.
+by rewrite addr_ge0 // [_%:A]mulr1 ltW //; near: h; exists 1 => //=.
+Unshelve. all: by end_near. Qed.
 
 Lemma sol1'_eq0 p t : limS sol K p -> 0 <= t -> (Fpendulum (sol p t))..[1] = 0.
 Proof.
@@ -599,8 +624,8 @@ Lemma Efctrl_psol0_eq0 p t : limS sol K p -> 0 <= t ->
   ke%:num * (E (sol p t)) * (fctrl (sol p t)) + kx%:num * (sol p t)..[0] = 0.
 Proof.
 move=> limSKp tge0.
-have -> :
-  0 = - (kd%:num * (sol p t)..[1] + kv%:num * (Fpendulum (sol p t))..[1]).
+rewrite [RHS](_ : _ =
+    - (kd%:num * (sol p t)..[1] + kv%:num * (Fpendulum (sol p t))..[1])); last first.
   by rewrite sol1'_eq0 // sol1_eq0 // !mulr0 add0r oppr0.
 have [circsolt /le_lt_trans /(_ k0_valid) Vsolts] : K (sol p t).
   by apply: Kinvar tge0; apply: subset_limSK_K.
@@ -647,7 +672,7 @@ Lemma En0_fctrlsol_const p t :
 Proof.
 move=> limSKp Epn0 tge0.
 have := Efctrl_psol0_eq0 limSKp tge0.
-rewrite -(Efctrl_psol0_eq0 limSKp (lexx _)) sol0
+rewrite -[X in _ = X -> _](Efctrl_psol0_eq0 limSKp (lexx _)) sol0
   [E (sol p t)](Esol_const limSKp tge0) (sol0_const limSKp tge0).
 have keEn0 : ke%:num * E p != 0 by rewrite mulrI_eq0 //; apply/lregP.
 move/(canRL (addrK _)); rewrite -addrA subrr addr0 mulrC.
@@ -703,7 +728,9 @@ have imgn0 : nonempty img.
 have infimg : has_inf img.
   by split=> //; exists fl; apply/lbP => ? /andP [/ltW].
 have [] := @IVT _ f _ _ ((fl + inf img) / 2) tge0.
-    by move=> s s0t; apply: fcont; rewrite [_ \in _](itvP s0t).
+  apply: continuous_subspaceT => x.
+  rewrite inE/= in_itv/= => /andP[x0 xt].
+  by apply: fcont => //=.
   apply/andP; split.
     rewrite ler_pdivl_mulr // mulrC mul2r ler_add2l.
     by apply: lb_le_inf imgn0 _; apply/lbP => ? /andP [/ltW].
@@ -850,7 +877,7 @@ have solroot_imf :
   have sol2_root :
     6%:R * g%:num * ((sol p s)..[2] ^+ 2) + C1 * (sol p s)..[2] +
     (- 3%:R * g%:num) = 0.
-    rewrite -sol2_val.
+    rewrite -[RHS]sol2_val.
     (* was ssrring *) admit.
   case/poly2_factor: sol2_root => {sol2_val} [|sol2_val|sol2_val] //.
     by exists (2%:R); rewrite sol2_val.
@@ -969,7 +996,7 @@ Lemma cvg_to_homoclinic_orbit p : K p ->
   sol p @ +oo --> (homoclinic_orbit : set [the pseudoMetricType _ of U]).
 Proof.
 move=> Kp A [_/posnumP[e] hoe_A]; apply: cvg_to_limS K_compact Kinvar _ Kp _ _.
-exists e%:num => // q [r /subset_limSK_homoclinic_orbit hor re_q].
+exists e%:num => //= q [r /subset_limSK_homoclinic_orbit hor re_q].
 by apply: hoe_A; exists r.
 Qed.
 

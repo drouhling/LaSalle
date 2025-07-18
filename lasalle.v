@@ -1,7 +1,7 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
-From mathcomp Require Import boolp reals Rstruct classical_sets posnum.
+From mathcomp Require Import boolp reals Rstruct classical_sets posnum functions.
 From mathcomp Require Import topology normedtype landau derive.
 
 Set Implicit Arguments.
@@ -84,7 +84,7 @@ have [G sGF IGBoA0] : exists2 G : {fset (set U)},
   have /Aco : closed_fam_of A F f.
     exists (fun C => closure C `&` ~` B^°).
       move=> C _; apply: closedI (@closed_closure _ _) _.
-      exact/closedC/open_interior.
+      by rewrite closedC; exact/open_interior.
     by move=> ? _; rewrite setIC.
   move=> /contra_not /(_ IFBoA0) /asboolPn /existsp_asboolPn [H /asboolPn].
   move=> /imply_asboolPn [sHF IHBoA0]; exists H => //.
@@ -190,7 +190,7 @@ rewrite ler_subr_addr addrC -ler_subr_addr; apply: ybndN; last by exists t.
 rewrite ltr_subr_addr; near: M; exists (N + N)%R.
 split => //.
 by rewrite realD.
-Grab Existential Variables. all: end_near. Qed.
+Unshelve. all: by end_near. Qed.
 
 Lemma continuous_on_compact (S T : topologicalType) (f : S -> T) (A : set S) :
   continuous_on A f -> compact A -> compact (f @` A).
@@ -234,7 +234,7 @@ Import numFieldTopology.Exports.
 Section DifferentialSystem.
 Context {R : realType}.
 Variable U : normedModType R.
-Let hU : hausdorff U := @norm_hausdorff _ U.
+Let hU : hausdorff_space U := @norm_hausdorff _ U.
 
 (* function defining the differential system *)
 Variable F : U -> U.
@@ -319,8 +319,12 @@ move: tge0; rewrite le_eqVlt orbC => /orP [tgt0|/eqP teq0].
   have /derivable_nbhs : derivable (sol p : R^o -> U) (t + t0) 1 by [].
   rewrite funeqE => /(_ s) /=; rewrite addrA [(_%:A)%R]mulr1 =>->.
   suff -> /= : (0 <= s + t)%R.
-    rewrite derive_val addrC addrA [(_ s + _)%R]addrC subrr add0r; near: s.
-    case: e => /=; apply/(eqoP (nbhs_filter_on (0%R : R))).
+    rewrite derive_val addrC addrA [(_ s + _)%R]addrC subrr add0r.
+    near: s.
+    case: e => /= e.
+    rewrite eq_sym -lt_neqAle.
+    move: e.
+    apply/(eqoP (nbhs_filter_on (0%R : R))).
     (* 0.3.6: 'o_[filter of nbhs 0%R] id  = 'o_(nbhs_filter_on 0%R) id  *)
     by [].
   near: s; exists t => // s; rewrite /ball_ /= => ltst.
@@ -330,13 +334,18 @@ rewrite -teq0.
 rewrite shift0.
 rewrite add0r.
 apply/eqaddoP => _ /posnumP[e]; near=> s.
-rewrite -![(_ + _ : _ -> _)%R _]/(_ + _)%R /= -[t0]add0r teq0.
+rewrite -![(_ + _ : _ -> _)%R _]/(_ + _)%R /=.
+rewrite -[t0]add0r/=.
+rewrite {1 2 3 4 5 6}teq0.
 have /derivable_nbhs dsol : derivable (sol p : R^o -> U) (t + t0) 1 by [].
 have := dsol; rewrite funeqE => /(_ (- s)%R) /=; rewrite [(_%:A)%R]mulr1 =>->.
 have := dsol; rewrite funeqE => /(_ s) /=; rewrite [(_%:A)%R]mulr1 =>->.
 rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
   rewrite addrC addrA [(_ s + _)%R]addrC subrr add0r; near: s.
-  case: e => /=; apply/(eqoP (nbhs_filter_on (0%R : R))).
+  case: e => /= e.
+  rewrite eq_sym -lt_neqAle.
+  move: e.
+  apply/(eqoP (nbhs_filter_on (0%R : R))).
 (* 0.3.6:
   'o_[filter of nbhs 0%R] id  = 'o_(nbhs_filter_on 0%R) id *)
   by [].
@@ -345,13 +354,14 @@ rewrite mulr2n scalerDl scale1r -[(_ - _ - sol _ _)%R]addrA -opprD subrr sub0r.
 rewrite scaleNr opprK addrC addKr -[in X in (_ <= X)%R]normrN; near: s.
 rewrite !near_simpl.
 rewrite -(nearN (fun x : R^o => `|_ x| <= e%:num * `|x|%R))%R.
-case: e => /= e e0.
+case: e => /= e.
+rewrite eq_sym -lt_neqAle => e0.
 near=> x.
 set u := (X in `|X x|%R).
 near: x.
 have := (@eqoP _ _ _ _ (nbhs_filter_on (0%R : R^o)) id u).1.
-exact.
-Grab Existential Variables. all: end_near. Qed.
+by apply => //.
+Unshelve. all: by end_near. Qed.
 
 Lemma solD p t0 t :
   K p -> (0 <= t0)%R -> (0 <= t)%R -> sol p (t + t0) = sol (sol p t0) t.
@@ -406,7 +416,10 @@ move=> A /nbhs_ballP [_ /posnumP[e] infe_A].
 have imf_inf : has_inf (fun x => x \in f @` (>= 0)%R).
    split; first by exists (f 0%R); rewrite in_setE; apply: imageP.
   by exists M; apply/lbP => ?; rewrite in_setE => /ltMf /ltW.
-have := imf_inf => /inf_adherent /(_ [gt0 of e%:num]%R) [x].
+have := imf_inf => /inf_adherent.
+move=> /(_ e%:num)%R.
+have e0 : (0 < e%:num)%R by [].
+move=> /(_ e0) [x].
 rewrite in_setE => -[t tge0 <-] ltftinfe; exists t; split.
   by rewrite realE tge0.
 move=> s ltts; apply: infe_A.
@@ -443,7 +456,7 @@ suff : exists l, cluster (sol q @ +oo%R) `<=` V @^-1` [set l].
     by rewrite /GRing.scale/= mulr1.
   rewrite Vpliml//.
     by rewrite Vpliml // subrr scaler0; apply: nbhs_singleton.
-  by apply: invariant_plim => //; apply: ltW; near: h; exists 1%R.
+  by apply: invariant_plim => //; apply: ltW; near: h; exists 1%R => //=.
 suff cvVsol : cvg (V \o sol q @ +oo%R).
   exists (lim (V \o sol q @ +oo%R)); apply: (c0_cvg_cst_on_plim Vcont)=> //.
   exact: compact_closed.
@@ -456,8 +469,14 @@ apply: nincr_lb_cvg; last first.
   rewrite (@le_lt_trans _ _ (N + 1)%R)// ?ltr_add2l ?ltr1n//.
   by apply: imVltN.2; [rewrite ltr_addl|apply/imageP/Kinvar].
 move=> s t /andP [sge0 slet].
-apply: ler0_derive1_nincr (lexx _) slet (lexx _).
-  move=> r rst; apply: Vsol_drvbl => //; apply: le_trans sge0 _.
+apply: ler0_derive1_nincr (lexx _) slet (lexx _); first 2 last.
+  apply: continuous_subspaceT => x.
+  rewrite inE/= in_itv/= => /andP[sx xt].
+  have := Vsol_drvbl _ _ Kq (le_trans sge0 sx).
+  move/derivable1_diffP/differentiable_continuous.
+  by apply.
+  move=> r rst.
+  apply: Vsol_drvbl => //; apply: le_trans sge0 _.
   by rewrite (itvP rst).
 move=> r rst; have rge0 : (0 <= r)%R by apply: le_trans sge0 _; rewrite (itvP rst).
 suff -> : derive1 (V \o sol q) r = derive1 (V \o (sol (sol q r))) 0.
@@ -466,15 +485,15 @@ rewrite derive1E /derive cvg_at_rightE; last exact: Vsol_drvbl.
 rewrite derive1E /derive cvg_at_rightE; last first.
   by apply: Vsol_drvbl => //; apply: Kinvar.
 congr (lim _); rewrite predeqE /= nbhs_filterE => A; split.
-  move=> [_/posnumP[e] Ae]; exists e%:num%R => // x xe xgt0.
+  move=> [_/posnumP[e] Ae]; exists e%:num%R=> //= x xe xgt0.
   rewrite sol0/=.
   rewrite addr0 -solD //; [by apply: Ae|].
   by rewrite /GRing.scale/= mulr1 ltW.
-move=> [_/posnumP[e] Ae]; exists e%:num%R => // x xe xgt0.
+move=> [_/posnumP[e] Ae]; exists e%:num%R => //= x xe xgt0.
 have /Ae - /(_ xe) := xgt0.
 rewrite sol0/= addr0 -solD //.
 by rewrite /GRing.scale/= mulr1 ltW.
-Grab Existential Variables. all: end_near. Qed.
+Unshelve. all: by end_near. Qed.
 
 Lemma cvg_to_limS (A : set U) : compact A -> is_invariant A ->
   forall p, A p -> sol p @ +oo%R --> (limS A : set [pseudoMetricType _ of U]).
@@ -482,9 +501,8 @@ Proof.
 move=> Aco Ainvar p Ap B [_/posnumP[e] limSeB].
 apply: (cvg_to_plim _ Aco).
   exists 0%R; split => //.
-    by rewrite realE lexx.
   by move=> _/posnumP[?]; apply: Ainvar.
-by exists e%:num%R=> // q [r plimr re_q]; apply: limSeB; exists r => //; exists p.
+by exists e%:num%R=> //= q [r plimr re_q]; apply: limSeB; exists r => //; exists p.
 Qed.
 
 End DifferentialSystem.
