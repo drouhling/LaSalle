@@ -387,7 +387,7 @@ Lemma invariant_plim p : K p -> is_invariant (cluster (sol p @ +oo%R)).
 Proof.
 move=> Kp q plim_q t0 t0_ge0 A B [M].
 wlog Mge0 : M / (0 <= M)%R => [sufMge0|] [Mreal solpMinfty_A].
-  apply: (sufMge0 (maxr 0%R M)); first by rewrite le_maxr lexx.
+  apply: (sufMge0 (maxr 0%R M)); first by rewrite le_max lexx.
   split.
     by rewrite max_real// real0.
   by move=> x; rewrite gt_max => /andP[_]; apply: solpMinfty_A.
@@ -395,10 +395,9 @@ have Kq : K q.
   apply: compact_closed => //.
   move=> C qC.
   move: plim_q; apply => //.
-  exists 0%R; split.
-    by rewrite real0.
+  exists 0%R; split => //.
   move=> t /ltW tge0.
-  by apply: Kinvar.
+  exact: Kinvar.
 move=> /(sol_cont Kq) /plim_q q_Bsolt0.
 have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo%R) (sol p @` (> M)%R `&` A).
   by exists M; split => // => t tgtM; split; [apply: imageP|apply: solpMinfty_A].
@@ -437,7 +436,10 @@ rewrite /ball/=.
 rewrite distrC ger0_norm.
   rewrite ltrBlDl.
   by apply: le_lt_trans ltftinfe; apply: fnincr; rewrite tge0 (ltW ltts).
-rewrite subr_ge0 inf_lower_bound // in_setE; apply: imageP.
+rewrite subr_ge0.
+apply: inf_lb => //.
+  by case: imf_inf.
+rewrite in_setE; apply: imageP.
 by apply: ltW; apply: le_lt_trans ltts.
 Qed.
 

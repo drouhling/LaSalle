@@ -2,7 +2,7 @@ From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
-From mathcomp Require Import matrix zmodp.
+From mathcomp Require Import matrix zmodp ring.
 From mathcomp Require Import mathcomp_extra.
 From mathcomp Require Import boolp reals Rstruct classical_sets signed functions.
 From mathcomp Require Import topology normedtype prodnormedzmodule landau derive.
@@ -151,7 +151,7 @@ rewrite -circq.
 rewrite /ball/=.
 rewrite opprD addrACA; apply: le_lt_trans (ler_normD _ _) _.
 by rewrite (splitr e%:num) ltrD //; [apply/p2e1_sp2he|apply/p3e2_sp3he];
-  apply: le_ball (pme12_q _ _); rewrite le_minl lexx // orbC.
+  apply: le_ball (pme12_q _ _); rewrite ge_min lexx // orbC.
 Qed.
 
 Lemma preimV_lek0_closed : closed (V @^-1` (<= k0 : _ -> _)).
@@ -289,7 +289,7 @@ suff : 2 * (V p) / ke%:num < (kv%:num / (ke%:num * (M%:num + m%:num))) ^+ 2.
 rewrite ltr_pdivrMr // mulrC -ltr_pdivlMr // (lt_le_trans Vp_s) //.
 rewrite -mulrA mulrCA mulrA; apply: ler_pM => //; apply: ler_pM => //.
 apply/ge0_expr_ndecr/andP; split; last first.
-  by rewrite le_minl/= lexx.
+  by rewrite ge_min/= lexx.
 by rewrite le_minr; apply/andP; split.
 Qed.
 
@@ -392,8 +392,8 @@ rewrite [_ * (_ - _ * y)]mulrDr addrA -[- (_ * y)]mulNr [_ * (_ * y)]mulrA.
 rewrite [_ + _ * y + _]addrAC; apply: (canLR (subrK _)); rewrite -mulrBl.
 rewrite [in RHS]mulrN opprK mulrACA [_ ^+2 / _]mulrAC mulfVK //.
 rewrite [_ / _]mulrC ![_^-1 * _]mulrA [_^-1 * _ * _]mulrC mulVKf //.
-(* was ssring *)admit.
-Admitted.
+ring.
+Qed.
 
 Lemma is_deriv_Vsol p t :
   K p -> 0 <= t -> V (sol p t) < B ->
@@ -416,8 +416,8 @@ apply: (canLR (mulfK _)) => //; rewrite [kv%:num * _]mulrDr addrA addrAC.
 apply: (canLR (subrK _)); rewrite mulrAC -mulrDl /fctrl [LHS]mulrA.
 have circp : (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 by apply: circ_invar.
 have fctrl_def := fctrl_wdef circp Vsolpt_s; apply: (canLR (mulfK _)) => //.
-(*by ssring.*) admit.
-Admitted.
+ring.
+Qed.
 
 Lemma defset_invar p : K p -> forall t, 0 <= t ->
   (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 /\ V (sol p t) < B.
@@ -447,7 +447,8 @@ have Vsolpinf_geB : B <= V (sol p (inf A)).
     by rewrite leNgt => /negP; apply; rewrite ltrDl.
   apply: lb_le_inf An0 _; apply/lbP => s /andP [sge0 Vsolps_geB].
   rewrite leNgt; apply/negP => ltsinfphe; have leinfs : inf A <= s.
-    apply: inf_lower_bound => //.
+    apply: inf_lb => //.
+      by case: infA.
     by rewrite /A/= sge0 Vsolps_geB.
   suff /infe_Vsolp : ball (inf A) e%:num s.
     rewrite /ball/= distrC => /(le_lt_trans (ler_norm _)).
@@ -460,7 +461,9 @@ have Vsol_drvbl t : t \in `]0, (inf A)[ ->
   move=> t0inf; apply: is_deriv_Vsol => //; first by rewrite (itvP t0inf).
   rewrite ltNge; apply/negP => Vsolpt_geB; suff : inf A <= t.
     by rewrite leNgt => /negP; apply; rewrite (itvP t0inf).
-  apply: inf_lower_bound => //; apply/andP; split=> //.
+  apply: inf_lb => //.
+    by case: infA.
+  apply/andP; split=> //.
   by rewrite (itvP t0inf).
 have : {in `[0, (inf A)]%classic, continuous (V \o sol p)}.
   move=> t t0inf; suff /differentiable_continuous :
@@ -639,9 +642,8 @@ rewrite opprD [RHS]mulrDl [RHS]addrC; apply/(canRL (subrK _))/Logic.eq_sym.
 rewrite mulrC -mulNr mulrA mulrA; apply: (canLR (mulfK _)) => //.
 rewrite [RHS]mulrDr [LHS]mulrDr addrC; apply: (canLR (subrK _)).
 rewrite mulrA -[in X in X / _]mulrA; apply: (canLR (mulfK _)) => //.
-(* was ssring. *)
-admit.
-Admitted.
+ring.
+Qed.
 
 Lemma div_fctrl_mP p t : limS sol K p -> 0 <= t ->
   (sol p t)..[3] * (g%:num * (sol p t)..[2] - l%:num * (sol p t)..[4] ^+ 2) =
@@ -664,9 +666,8 @@ apply: (canLR (mulfK _)); last apply/Logic.eq_sym.
 rewrite mulrCA mulrA mulrA [l%:num * _ in LHS]mulrC mulrVK ?unitfE //.
 have [] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
 rewrite addrC => /(canRL (addrK _)) -> _.
-(* ssrring *)
-admit.
-Admitted.
+ring.
+Qed.
 
 Lemma En0_fctrlsol_const p t :
   limS sol K p -> E p != 0 -> 0 <= t -> fctrl (sol p t) = fctrl p.
@@ -692,12 +693,14 @@ have Amin : \big[minr/t]_(s <- enum_fset A) s \in A.
     by apply: inA; rewrite mem_head.
   by apply: ihl => r lr; apply: inA; rewrite inE orbC lr.
 suff -> : inf [set t | t \in A] = \big[minr/t]_(s <- enum_fset A) s by [].
-apply/eqP; rewrite eq_le; apply/andP; split; first exact: inf_lower_bound Amin.
+apply/eqP; rewrite eq_le; apply/andP; split.
+  apply: inf_lb => //.
+  by case: infA.
 apply: lb_le_inf; first by have [] := infA.
 apply/lbP => s As; have : s \in enum_fset A by [].
 elim: (enum_fset A) => // r l ihl; rewrite inE => /orP [/eqP <-|].
-  by rewrite big_cons le_minl lexx.
-by rewrite big_cons le_minl orbC => /ihl ->.
+  by rewrite big_cons ge_min lexx.
+by rewrite big_cons ge_min orbC => /ihl ->.
 Qed.
 
 Lemma continuous_finimage_cst (f : R -> R) n (g : 'I_n -> R) :
@@ -736,10 +739,14 @@ have [] := @IVT _ f _ _ ((fl + inf img) / 2) tge0.
     rewrite ler_pdivlMr // mulrC mul2r lerD2l.
     by apply: lb_le_inf imgn0 _; apply/lbP => ? /andP [/ltW].
   rewrite ler_pdivrMr // mulrC mul2r lerD //; first exact: ltW.
-  by apply: inf_lower_bound infimg _ _; apply/andP; split=> //; apply/asboolP.
+  apply: inf_lb => //.
+    by case: infimg.
+  by apply/andP; split=> //; apply/asboolP.
 move=> s s0t fsemid; suff ltfl_inf : fl < inf img.
   have : inf img <= (fl + inf img) / 2.
-    apply: inf_lower_bound (infimg) _ _; apply/andP; split; last first.
+    apply: inf_lb.
+      by case: infimg.
+    apply/andP; split; last first.
       have /finim_f [i] : 0 <= s by rewrite (itvP s0t).
       by rewrite fsemid => midegi; apply/asboolP; exists i.
     by rewrite ltr_pdivlMr // mulrC mul2r ltrD2l.
@@ -836,7 +843,7 @@ have sol32_val : forall s, 0 <= s ->
   rewrite mulVKr ?unitfE // mul1r mulrBr addrC; apply: (canLR (subrK _)).
   rewrite -mulNr mulrDr addrC; apply: (canLR (subrK _)).
   rewrite mulrA; apply: (canLR (mulfK _)) => //.
-  (* was ssrring *) admit.
+  ring.
 have sol423_val s : 0 <= s ->
   (sol p s)..[4] * (3%:R * g%:num * ((sol p s)..[2] ^+ 2 -
   (sol p s)..[3] ^+ 2) + C1 * (sol p s)..[2]) = 0.
@@ -844,7 +851,8 @@ have sol423_val s : 0 <= s ->
     exact: is_derive_cst.
   have [_ /(_ _ sge0) sol_ats] := sol_is_sol sol0 solP Kp; apply: is_derive_eq.
   rewrite !mxE /=.
-  (* was ssrring *) admit.
+  rewrite /GRing.scale/=.
+  ring.
 have sol432_val' s : 0 <= s ->
   (sol p s)..[3] * (g%:num / l%:num * (3%:R * g%:num * ((sol p s)..[2] ^+ 2 -
     (sol p s)..[3] ^+ 2) + C1 * (sol p s)..[2]) -
@@ -857,8 +865,7 @@ have sol432_val' s : 0 <= s ->
   rewrite [in RHS]mulrDl; apply: (canRL (subrK _)).
   rewrite [(sol p s)..[3] * _]mulrDr [in RHS]mulrDl; apply: (canRL (subrK _)).
   rewrite [_ / _ * _]mulrC [in RHS]mulrA [in RHS]mulrA mulrVK ?unitfE //.
-  (* was ssring *)
-  admit.
+  ring.
 set x1 := (- C1 + Num.sqrt (C1 ^+ 2 - 4%:R * (6%:R * g%:num) *
   (- 3%:R * g%:num))) / (2 * (6%:R * g%:num)).
 set x2 := (- C1 - Num.sqrt (C1 ^+ 2 - 4%:R * (6%:R * g%:num) *
@@ -885,7 +892,7 @@ have solroot_imf :
     6%:R * g%:num * ((sol p s)..[2] ^+ 2) + C1 * (sol p s)..[2] +
     (- 3%:R * g%:num) = 0.
     rewrite -[RHS]sol2_val.
-    (* was ssrring *) admit.
+    ring.
   case/poly2_factor: sol2_root => {sol2_val} [|sol2_val|sol2_val] //.
     by exists (2%:R); rewrite sol2_val.
   by exists (3%:R); rewrite sol2_val.
@@ -900,7 +907,7 @@ case: (eqVneq ((sol p s)..[3]) 0) => [sol3e0|sol3ne0].
   by exists 0.
 move=> /eqP; rewrite mulrI_eq0; last exact/lregP.
 by rewrite mulrI_eq0=> [/eqP|] //; apply/lregP.
-Admitted.
+Qed.
 
 Lemma En0_sol3_const p :
   limS sol K p -> E p != 0 -> forall t, 0 <= t -> (sol p t)..[3] = p..[3].
@@ -983,7 +990,7 @@ have /lt_le_trans : V (sol p t) < B.
   have [_ Vsolp_s] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
   exact: le_lt_trans k0_valid.
 rewrite /B; apply; apply: ler_pM => //; apply: ler_pM => //.
-by rewrite lerXn2r // ?nnegrE // le_minl lexx orbC.
+by rewrite lerXn2r // ?nnegrE // ge_min lexx orbC.
 Qed.
 
 Lemma subset_limSK_homoclinic_orbit : limS sol K `<=` homoclinic_orbit.
