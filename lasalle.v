@@ -11,6 +11,9 @@ Import GRing.Theory Num.Def Num.Theory Order.POrderTheory Order.TotalTheory.
 
 Local Open Scope classical_set_scope.
 
+Lemma mul2r (R : ringType) (x : R) : (2 * x = x + x)%R.
+Proof. by rewrite -mulr2n mulr_natl. Qed.
+
 Section pseudoMetricType_numDomainType.
 Context {R : numDomainType} {M : pseudoMetricType R}.
 
@@ -350,7 +353,9 @@ rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
   'o_[filter of nbhs 0%R] id  = 'o_(nbhs_filter_on 0%R) id *)
   by [].
 rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _)%R _]/(- _)%R !addrA.
-rewrite mulr2n scalerDl scale1r -[(_ - _ - sol _ _)%R]addrA -opprD subrr sub0r.
+rewrite [X in (X *: _)%R](_ : _ = (1 + 1)%R); last first.
+  done.
+rewrite scalerDl scale1r -[(_ - _ - sol _ _)%R]addrA -opprD subrr sub0r.
 rewrite scaleNr opprK addrC addKr -[in X in (_ <= X)%R]normrN; near: s.
 rewrite !near_simpl.
 rewrite -(nearN (fun x : R^o => `|_ x| <= e%:num * `|x|%R))%R.
@@ -446,7 +451,7 @@ suff : exists l, cluster (sol q @ +oo%R) `<=` V @^-1` [set l].
   move=> [l Vpliml]/=; rewrite derive1E /derive cvg_at_rightE; last first.
     apply: Vsol_drvbl => //; apply: compact_closed => //.
     exact: sub_plim_clos_invar plimp.
-  apply: (@cvg_map_lim _ _ _ (at_right _)) => // A A0.
+  apply: (@cvg_lim _ _ _ (at_right _)) => // A A0.
     rewrite -closeEnbhs.
      move/close_eq; apply.
      exact: Rhausdorff.
@@ -470,7 +475,7 @@ apply: nincr_lb_cvg; last first.
   by apply: imVltN.2; [rewrite ltr_addl|apply/imageP/Kinvar].
 move=> s t /andP [sge0 slet].
 apply: ler0_derive1_nincr (lexx _) slet (lexx _); first 2 last.
-  apply: continuous_subspaceT => x.
+  apply: continuous_in_subspaceT => x.
   rewrite inE/= in_itv/= => /andP[sx xt].
   have := Vsol_drvbl _ _ Kq (le_trans sge0 sx).
   move/derivable1_diffP/differentiable_continuous.

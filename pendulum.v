@@ -203,10 +203,6 @@ suff : \forall M \near +oo, forall p, K p -> forall i, `|p ord0 i| < M.
   rewrite /normr/=.
   rewrite mx_normrE.
   apply/bigmax_leP; split => //.
-    near: M.
-    exists 0%R; split.
-      by rewrite realE lexx.
-    by move=> x /ltW.
   move=> i _.
   rewrite ord1.
   apply/ltW.
@@ -330,14 +326,14 @@ Proof.
 move=> f'eq0 t tab; apply/eqP; rewrite eq_le; apply/andP; split.
   apply: (@ler0_derive1_nincr _ _ a b) => //; rewrite ?(itvP tab) //;[
     by move=> x /subset_itv_oo_cc /f'eq0 // df; rewrite derive1E derive_val..|].
-  apply: continuous_subspaceT => x.
+  apply: continuous_in_subspaceT => x.
   rewrite inE/= => /f'eq0.
   move=> /(@ex_derive _ [the normedModType R of R^o]).
   move=> /derivable1_diffP /differentiable_continuous.
   exact.
 apply: (@le0r_derive1_ndecr _ _ a b) => //; rewrite ?(itvP tab) //;[
   by move=> x /subset_itv_oo_cc /f'eq0 // df; rewrite derive1E derive_val..|].
-apply: continuous_subspaceT => x.
+apply: continuous_in_subspaceT => x.
 rewrite inE/= => /f'eq0.
 move=> /(@ex_derive _ [the normedModType R of R^o]).
 move=> /derivable1_diffP /differentiable_continuous.
@@ -467,7 +463,7 @@ have : {in `[0, (inf A)]%classic, continuous (V \o sol p)}.
   apply/derivable1_diffP/Vsolp_drvbl.
   rewrite inE/= in t0inf.
   by rewrite (itvP t0inf).
-move/continuous_subspaceT.
+move/continuous_in_subspaceT.
 move=> /(MVT_segment infge0)[t t0inf].
 rewrite /comp sol0 subr0 => dVsol.
 have infgt0 : 0 < inf A.
@@ -504,7 +500,7 @@ apply: (@ler0_derive1_nincr _ (V \o sol p) 0 t);[| | |by [] |by [] |by []].
   rewrite derive1E.
   case => _ ->.
   by rewrite mulr_le0_ge0// sqr_ge0.
-apply: continuous_subspaceT => x.
+apply: continuous_in_subspaceT => x.
 rewrite inE/= => /Vsol_deriv.
 move=> /(@ex_derive _ [the normedModType R of R^o]).
 move=> /derivable1_diffP /differentiable_continuous.
@@ -583,7 +579,7 @@ move=> feg tge0 df dg.
 have /@derive_val <- := df; have /@derive_val <- := dg.
 apply: subr0_eq; rewrite -deriveB // /derive cvg_at_rightE; last first.
   by rewrite -[cvg _]/(derivable _ _ _).
-apply: cvg_map_lim => A A0.
+apply: cvg_lim => A A0.
   rewrite -closeEnbhs.
   by rewrite norm_closeE.
 rewrite !near_simpl; near=> h.
@@ -728,7 +724,7 @@ have imgn0 : nonempty img.
 have infimg : has_inf img.
   by split=> //; exists fl; apply/lbP => ? /andP [/ltW].
 have [] := @IVT _ f _ _ ((fl + inf img) / 2) tge0.
-  apply: continuous_subspaceT => x.
+  apply: continuous_in_subspaceT => x.
   rewrite inE/= in_itv/= => /andP[x0 xt].
   by apply: fcont => //=.
   apply/andP; split.
