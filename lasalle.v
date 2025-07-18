@@ -1,7 +1,7 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
-From mathcomp Require Import boolp reals Rstruct classical_sets posnum functions.
+From mathcomp Require Import boolp reals Rstruct classical_sets signed functions.
 From mathcomp Require Import topology normedtype landau derive.
 
 Set Implicit Arguments.

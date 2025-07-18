@@ -3,7 +3,7 @@ From mathcomp Require Import order.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import matrix zmodp.
 From mathcomp Require Import mathcomp_extra.
-From mathcomp Require Import boolp reals Rstruct classical_sets posnum functions.
+From mathcomp Require Import boolp reals Rstruct classical_sets signed functions.
 From mathcomp Require Import topology normedtype prodnormedzmodule landau derive.
 Require Import lasalle.
 
@@ -127,7 +127,7 @@ Proof.
 move=> x; suff : differentiable (fun y : R^o => y ^+ n.+1) x.
   by apply: differentiable_continuous.
 suff -> : (fun y => y ^+ n.+1) = ((id : R^o -> R^o) ^+ n.+1) by [].
-by rewrite exprfunE.
+by rewrite exprfctE.
 Qed.
 
 Lemma circle_closed : closed [set p : U | p..[2] ^+ 2 + p..[3] ^+ 2 = 1].
@@ -202,7 +202,7 @@ suff : \forall M \near +oo, forall p, K p -> forall i, `|p ord0 i| < M.
   move=> Kbnd /= p /Kbnd ltpM.
   rewrite /normr/=.
   rewrite mx_normrE.
-  apply/bigmax_lerP; split => //.
+  apply/bigmax_leP; split => //.
     near: M.
     exists 0%R; split.
       by rewrite realE lexx.
