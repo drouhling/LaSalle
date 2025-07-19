@@ -1,10 +1,10 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
-From mathcomp Require Import order.
+From mathcomp Require Import order interval_inference.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
 From mathcomp Require Import matrix zmodp ring.
 From mathcomp Require Import mathcomp_extra.
-From mathcomp Require Import boolp reals Rstruct classical_sets signed functions.
+From mathcomp Require Import boolp reals classical_sets functions.
 From mathcomp Require Import topology normedtype prodnormedzmodule landau derive.
 Require Import lasalle.
 
@@ -324,14 +324,14 @@ Lemma eq0_derive1_cst (f : R^o -> R^o) (a b : R) :
   forall t, t \in `[a, b] -> f t = f a.
 Proof.
 move=> f'eq0 t tab; apply/eqP; rewrite eq_le; apply/andP; split.
-  apply: (@ler0_derive1_nincr _ _ a b) => //; rewrite ?(itvP tab) //;[
+  apply: (@ler0_derive1_le_cc _ _ a b) => //; rewrite ?(itvP tab) //;[
     by move=> x /subset_itv_oo_cc /f'eq0 // df; rewrite derive1E derive_val..|].
   apply: continuous_in_subspaceT => x.
   rewrite inE/= => /f'eq0.
   move=> /(@ex_derive _ [the normedModType R of R^o]).
   move=> /derivable1_diffP /differentiable_continuous.
   exact.
-apply: (@le0r_derive1_ndecr _ _ a b) => //; rewrite ?(itvP tab) //;[
+apply: (@ger0_derive1_ndecr _ _ a b) => //; rewrite ?(itvP tab) //;[
   by move=> x /subset_itv_oo_cc /f'eq0 // df; rewrite derive1E derive_val..|].
 apply: continuous_in_subspaceT => x.
 rewrite inE/= => /f'eq0.
@@ -392,6 +392,7 @@ rewrite [_ * (_ - _ * y)]mulrDr addrA -[- (_ * y)]mulNr [_ * (_ * y)]mulrA.
 rewrite [_ + _ * y + _]addrAC; apply: (canLR (subrK _)); rewrite -mulrBl.
 rewrite [in RHS]mulrN opprK mulrACA [_ ^+2 / _]mulrAC mulfVK //.
 rewrite [_ / _]mulrC ![_^-1 * _]mulrA [_^-1 * _ * _]mulrC mulVKf //.
+rewrite /=.
 ring.
 Qed.
 
@@ -416,7 +417,7 @@ apply: (canLR (mulfK _)) => //; rewrite [kv%:num * _]mulrDr addrA addrAC.
 apply: (canLR (subrK _)); rewrite mulrAC -mulrDl /fctrl [LHS]mulrA.
 have circp : (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1 by apply: circ_invar.
 have fctrl_def := fctrl_wdef circp Vsolpt_s; apply: (canLR (mulfK _)) => //.
-ring.
+rewrite /=; ring.
 Qed.
 
 Lemma defset_invar p : K p -> forall t, 0 <= t ->
@@ -501,18 +502,20 @@ apply: le_trans Vp_s; rewrite -{2}[p]sol0.
 have Vsol_deriv : forall s, s \in `[0, t] ->
   is_derive (s : R^o) 1 (V \o sol p : _ -> R^o)
   (- kd%:num * (sol p s)..[1] ^+ 2) by move=> s /andP [/(is_derive_Vsol Kp)].
-apply: (@ler0_derive1_nincr _ (V \o sol p) 0 t);[| | |by [] |by [] |by []].
-  move=> x /subset_itv_oo_cc /Vsol_deriv.
+apply: (@ler0_derive1_le_cc _ (V \o sol p) 0 t);[| | | | |by []].
+- move=> x /subset_itv_oo_cc /Vsol_deriv.
   by apply: (@ex_derive _ [the normedModType R of R^o]).
-  move=> x /subset_itv_oo_cc /Vsol_deriv.
+- move=> x /subset_itv_oo_cc /Vsol_deriv.
   rewrite derive1E.
   case => _ ->.
   by rewrite mulr_le0_ge0// sqr_ge0.
-apply: continuous_in_subspaceT => x.
-rewrite inE/= => /Vsol_deriv.
-move=> /(@ex_derive _ [the normedModType R of R^o]).
-move=> /derivable1_diffP /differentiable_continuous.
-exact.
+- apply: continuous_in_subspaceT => x.
+  rewrite inE/= => /Vsol_deriv.
+  move=> /(@ex_derive _ [the normedModType R of R^o]).
+  move=> /derivable1_diffP /differentiable_continuous.
+  exact.
+- by rewrite in_itv/= lexx tge0.
+- by rewrite in_itv/= lexx tge0.
 Qed.
 
 Definition homoclinic_orbit : set U := [set p : U | p..[0] = 0 /\ p..[1] = 0 /\
@@ -642,7 +645,7 @@ rewrite opprD [RHS]mulrDl [RHS]addrC; apply/(canRL (subrK _))/Logic.eq_sym.
 rewrite mulrC -mulNr mulrA mulrA; apply: (canLR (mulfK _)) => //.
 rewrite [RHS]mulrDr [LHS]mulrDr addrC; apply: (canLR (subrK _)).
 rewrite mulrA -[in X in X / _]mulrA; apply: (canLR (mulfK _)) => //.
-ring.
+rewrite /=; ring.
 Qed.
 
 Lemma div_fctrl_mP p t : limS sol K p -> 0 <= t ->
@@ -666,7 +669,7 @@ apply: (canLR (mulfK _)); last apply/Logic.eq_sym.
 rewrite mulrCA mulrA mulrA [l%:num * _ in LHS]mulrC mulrVK ?unitfE //.
 have [] : K (sol p t) by apply/subset_limSK_K/limSKinvar.
 rewrite addrC => /(canRL (addrK _)) -> _.
-ring.
+rewrite /=; ring.
 Qed.
 
 Lemma En0_fctrlsol_const p t :

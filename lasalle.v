@@ -1,8 +1,8 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
-From mathcomp Require Import order.
+From mathcomp Require Import order interval_inference.
 From mathcomp Require Import fintype bigop ssralg ssrnum finmap interval ssrint.
-From mathcomp Require Import boolp reals Rstruct classical_sets signed functions.
+From mathcomp Require Import boolp reals classical_sets functions.
 From mathcomp Require Import topology normedtype landau derive.
 
 Set Implicit Arguments.
@@ -75,20 +75,20 @@ Proof.
 move=> FF FA; rewrite compact_In0 => Aco e egt0.
 set B := ball_set (cluster F) e.
 have Fn0 : F !=set0 by exists A.
-have : A `&` (cluster F `\` B^°) = set0.
-  suff -> : cluster F `\` B^° = set0 by rewrite setI0.
+have : A `&` (cluster F `\` B°) = set0.
+  suff -> : cluster F `\` B° = set0 by rewrite setI0.
   rewrite setD_eq0 => p clFp.
   by rewrite /interior -nbhs_ballE; exists e => // ??; exists p.
 rewrite clusterE.
 rewrite -[_ `\` _]bigcapIl // setIC.
 rewrite -bigcapIl // => IFBoA0.
-set f := fun C => closure C `&` ~` B^° `&` A.
+set f := fun C => closure C `&` ~` B° `&` A.
 have [G sGF IGBoA0] : exists2 G : {fset (set U)},
   {subset G <= F} & \bigcap_(C in [set C | C \in G]) f C = set0.
   have {}IFBoA0 : ~ (\bigcap_(C in F) f C !=set0).
     by move=> [p IFBoAp]; rewrite -[False]/(set0 p) -IFBoA0.
   have /Aco : closed_fam_of A F f.
-    exists (fun C => closure C `&` ~` B^°).
+    exists (fun C => closure C `&` ~` B°).
       move=> C _; apply: closedI (@closed_closure _ _) _.
       by rewrite closedC; exact/open_interior.
     by move=> ? _; rewrite setIC.
@@ -99,10 +99,10 @@ have Gn0 : [set C | C \in G] !=set0.
   apply: contrapT => /asboolPn /forallp_asboolPn G0.
   by rewrite -[False]/(@set0 U point) -IGBoA0 => ? /G0.
 move: IGBoA0; have -> : \bigcap_(C in [set C | C \in G]) f C =
-  \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` B^°).
+  \bigcap_(C in [set C | C \in G]) (A `&` closure C `&` ~` B°).
   by rewrite predeqE => a; split=> IGBoAa ? /IGBoAa [[]].
 rewrite bigcapIl // setD_eq0 => sIGABo.
-suff : F B^° by apply: filterS => ?; apply: nbhs_singleton.
+suff : F B° by apply: filterS => ?; apply: nbhs_singleton.
 apply: filterS sIGABo _; apply: filter_bigI => C /sGF; rewrite in_setE => FC.
 by apply: filterI FA _; apply: filterS (@subset_closure _ C) _.
 Qed.
@@ -330,7 +330,7 @@ move: tge0; rewrite le_eqVlt orbC => /orP [tgt0|/eqP teq0].
     rewrite derive_val addrC addrA [(_ s + _)%R]addrC subrr add0r.
     near: s.
     case: e => /= e.
-    rewrite eq_sym -lt_neqAle.
+    rewrite /Itv.num_sem/= num_real/= in_itv/= andbT.
     move: e.
     apply/(eqoP (nbhs_filter_on (0%R : R))).
     (* 0.3.6: 'o_[filter of nbhs 0%R] id  = 'o_(nbhs_filter_on 0%R) id  *)
@@ -351,7 +351,7 @@ have := dsol; rewrite funeqE => /(_ s) /=; rewrite [(_%:A)%R]mulr1 =>->.
 rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
   rewrite addrC addrA [(_ s + _)%R]addrC subrr add0r; near: s.
   case: e => /= e.
-  rewrite eq_sym -lt_neqAle.
+  rewrite /Itv.num_sem num_real in_itv/= andbT.
   move: e.
   apply/(eqoP (nbhs_filter_on (0%R : R))).
 (* 0.3.6:
@@ -365,7 +365,7 @@ rewrite scaleNr opprK addrC addKr -[in X in (_ <= X)%R]normrN; near: s.
 rewrite !near_simpl.
 rewrite -(nearN (fun x : R^o => `|_ x| <= e%:num * `|x|%R))%R.
 case: e => /= e.
-rewrite eq_sym -lt_neqAle => e0.
+rewrite /Itv.num_sem num_real in_itv/= andbT => e0.
 near=> x.
 set u := (X in `|X x|%R).
 near: x.
@@ -478,12 +478,15 @@ apply: nincr_lb_cvg; last first.
   rewrite (@le_lt_trans _ _ (N + 1)%R)// ?ltrD2l ?ltr1n//.
   by apply: imVltN.2; [rewrite ltrDl|apply/imageP/Kinvar].
 move=> s t /andP [sge0 slet].
-apply: ler0_derive1_nincr (lexx _) slet (lexx _); first 2 last.
+apply: (@ler0_derive1_le_cc _ _ s t); first 2 last.
   apply: continuous_in_subspaceT => x.
   rewrite inE/= in_itv/= => /andP[sx xt].
   have := Vsol_drvbl _ _ Kq (le_trans sge0 sx).
   move/derivable1_diffP/differentiable_continuous.
   by apply.
+  by rewrite in_itv/= slet lexx.
+  by rewrite in_itv/= lexx slet.
+  by [].
   move=> r rst.
   apply: Vsol_drvbl => //; apply: le_trans sge0 _.
   by rewrite (itvP rst).
