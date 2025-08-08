@@ -8,7 +8,9 @@ From mathcomp Require Import topology normedtype landau derive.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+
 Import GRing.Theory Num.Def Num.Theory Order.POrderTheory Order.TotalTheory.
+Import numFieldTopology.Exports.
 
 Local Open Scope classical_set_scope.
 
@@ -48,16 +50,10 @@ rewrite predeqE => p; split.
   by rewrite lt_max orbC ltr01.
 move=> clyp e egt0 T Tgt0.
 have [] := clyp (y @` ltr T) (ball p e).
-  exists T; split => //.
-    by rewrite realE (ltW Tgt0).
-  by apply: imageP.
+  by exists T; rewrite num_real; split => //; exact: imageP.
   by rewrite -nbhs_ballE; exists e.
 by move=> _ [[t ? <-] ?]; exists t.
 Qed.
-
-(* mathcomp/analysis issue: should be inferred *)
-Instance infty_proper : @ProperFilter R +oo%R.
-Proof. exact: proper_pinfty_nbhs. Qed.
 
 Lemma plimn0 (y : R -> U) (A : set U) :
   compact A -> (y @ +oo%R) A -> cluster (y @ +oo%R) !=set0.
@@ -111,7 +107,7 @@ Lemma cvg_to_plim (y : R -> U) (A : set U) :
   (y @ +oo%R) A -> compact A -> y @ +oo%R --> cluster (y @ +oo%R).
 Proof.
 move=> yinftyA coA B [e egt0 scleB].
-by apply: filterS scleB _; apply: filter_cluster coA _ egt0.
+by apply: filterS scleB _; exact: filter_cluster coA _ egt0.
 Qed.
 
 (* Lemma cvg_to_plim y (A : set U) : *)
@@ -133,17 +129,16 @@ Qed.
 (* by exists p => // C D yinftyC; apply/plimnBp; apply: flim_within yinftyC. *)
 (* Qed. *)
 
-Lemma sub_image_at_infty (y : R -> U) (A : set U) : y @` (>= 0)%R `<=` A -> (y @ +oo%R) A.
+Lemma sub_image_at_infty (y : R -> U) (A : set U) :
+  y @` (>= 0)%R `<=` A -> (y @ +oo%R) A.
 Proof.
-move=> syRpA; exists 0%R; split.
-  by rewrite real0.
-move=> t tgt0.
+move=> syRpA; exists 0%R; rewrite real0; split => // t tgt0.
 exact/syRpA/imageP/ltW.
 Qed.
 
 Lemma sub_plim_clos_invar (y : R -> U) (A : set U) :
   y @` (>= 0)%R `<=` A -> cluster (y @ +oo%R) `<=` closure A.
-Proof. by move=> syRpA p ypp B /ypp; apply; apply: sub_image_at_infty. Qed.
+Proof. by move=> syRpA p ypp B /ypp; apply; exact: sub_image_at_infty. Qed.
 
 (* to mathcomp/analysis ? *)
 Definition continuous_on (T U : topologicalType) (A : set T) (f : T -> U) :=
@@ -193,9 +188,7 @@ apply: (le_trans (ler_normD _ _)).
 rewrite -lerBrDr.
 apply/ltW; apply: lt_le_trans pN_yt _.
 rewrite lerBrDr addrC -lerBrDr; apply: ybndN; last by exists t.
-rewrite ltrBrDr; near: M; exists (N + N)%R.
-split => //.
-by rewrite realD.
+by rewrite ltrBrDr; near: M; exists (N + N)%R; rewrite realD.
 Unshelve. all: by end_near. Qed.
 
 Lemma continuous_on_compact (S T : topologicalType) (f : S -> T) (A : set S) :
@@ -215,27 +208,19 @@ have : G (A `&` f @^-1` B) by exists B.
 by move=> /clsGp /(_ p_Cf) [q [[Aq ?] /(_ Aq)]]; exists (f q).
 Qed.
 
-(* to mathcomp/analysis *)
+(* TODO: PR to mathcomp-analysis? *)
 Lemma nearN (R : realFieldType) (P : set R) :
   (\forall x \near (0%R : R^o), P x) = (\forall x \near (0%R : R^o), P (- x)%R).
 Proof.
 rewrite propeqE; split.
-  move/(@nbhs_ballP _ [the pseudoMetricType _ of R^o]).
-  move=> [e egt0 seP]; exists e => // x.
-  move=> ex.
-  apply: seP.
-  move: ex.
-  by rewrite /ball/= /ball_/= opprK !add0r normrN.
-move/(@nbhs_ballP _ [the pseudoMetricType _ of R^o]).
-move=> [e egt0 seP]; exists e => // x.
-move=> ex.
-rewrite -(opprK x).
-apply: seP.
-move: ex.
-by rewrite /ball/= /ball_/= opprK !add0r normrN.
-Qed.
-
-Import numFieldTopology.Exports.
+  move/nbhs_ballP => [e e0 eP].
+  near=> x; apply: eP; rewrite /ball/= opprK add0r.
+  by near: x; exact: (@nbhs0_lt _ R^o).
+move/nbhs_ballP => [e e0 eP].
+near=> x.
+rewrite -(opprK x); apply: eP; rewrite /ball/= opprK add0r.
+by near: x; exact: (@nbhs0_lt _ R^o).
+Unshelve. all: by end_near. Qed.
 
 Section DifferentialSystem.
 Context {R : realType}.
@@ -254,7 +239,7 @@ Variable K : set U.
 Hypothesis Kco : compact K.
 
 (* solution function *)
-Variable (sol : U -> R -> U).
+Variable sol : U -> R -> U.
 Hypothesis (sol0 : forall p, sol p 0 = p).
 Hypothesis solP : forall y : R -> U, K (y 0%R) -> is_sol y <-> y = sol (y 0%R).
 Hypothesis sol_cont : forall t, continuous_on K (sol^~ t).
@@ -283,20 +268,10 @@ move=> Kp t0ge0; split=> [t tlt0|t tge0].
   by rewrite add0r.
 suff dshift : (shift_sol p t0) \o shift t = (cst (shift_sol p t0 t) +
   (fun h : R^o => h *: F (shift_sol p t0 t)))%R +o_ (0%R : R^o) (id : R^o -> R^o).
-(*  have dshiftE : 'd (shift_sol p t0) (t : R^o) =
-    (fun h => h *: F (shift_sol p t0 t))%R :> (R^o -> U).
-    have lin_scal : linear (fun h : R^o => h *: F (shift_sol p t0 t)).
-      by move=> ???; rewrite scalerDl scalerA.
-    have ->: (fun h : R^o => h *: F (shift_sol p t0 t)) = Linear lin_scal by [].
-    apply: diff_unique; first exact: scalel_continuous.
-    by apply/eqaddoE; rewrite dshift.*)
   move=> [:dshiftE].
   have diff_shift : differentiable (shift_sol p t0 : R^o -> _) t.
     apply/diff_locallyP; split; last first.
       apply/eqaddoE; rewrite dshift.
-(* 0.3.6:
-  (cst (shift_sol p t0 t) +  *:%R^~ (F (shift_sol p t0 t)) + 'o_[filter of 0] id )%R =
-  (cst (shift_sol p t0 t) + 'd (shift_sol p t0) t + 'a_o_(nbhs_filter_on 0) id )%R *)
       congr +%R.
 (* 0.3.6:
   (cst (shift_sol p t0 t) +  *:%R^~ (F (shift_sol p t0 t)))%R =
@@ -307,7 +282,7 @@ suff dshift : (shift_sol p t0) \o shift t = (cst (shift_sol p t0 t) +
         by move=> ???; rewrite scalerDl scalerA.
       pose glM := GRing.isLinear.Build _ _ _ _ _ lin_scal.
       pose gL : {linear R^o -> U} := HB.pack ( *:%R^~ (F (shift_sol p t0 t))) glM.
-      have ->: (fun h : R^o => h *: F (shift_sol p t0 t))%R = gL by [].
+      have -> : (fun h : R^o => h *: F (shift_sol p t0 t))%R = gL by [].
       apply/esym.
       apply: diff_unique; first exact: scalel_continuous.
       apply/eqaddoE; rewrite dshift.
@@ -358,8 +333,7 @@ rewrite -{1}teq0 derive_val; case: (lerP 0 s) => [le0s|lts0].
   'o_[filter of nbhs 0%R] id  = 'o_(nbhs_filter_on 0%R) id *)
   by [].
 rewrite !opprD oppox /cst /= addrACA -[(- _ : _ -> _)%R _]/(- _)%R !addrA.
-rewrite [X in (X *: _)%R](_ : _ = (1 + 1)%R); last first.
-  done.
+rewrite [X in (X *: _)%R](_ : _ = (1 + 1)%R); last by [].
 rewrite scalerDl scale1r -[(_ - _ - sol _ _)%R]addrA -opprD subrr sub0r.
 rewrite scaleNr opprK addrC addKr -[in X in (_ <= X)%R]normrN; near: s.
 rewrite !near_simpl.
@@ -369,8 +343,7 @@ rewrite /Itv.num_sem num_real in_itv/= andbT => e0.
 near=> x.
 set u := (X in `|X x|%R).
 near: x.
-have := (@eqoP _ _ _ _ (nbhs_filter_on (0%R : R^o)) id u).1.
-by apply => //.
+exact: (@eqoP _ _ _ _ (nbhs_filter_on (0%R : R^o)) id u).1.
 Unshelve. all: by end_near. Qed.
 
 Lemma solD p t0 t :
@@ -392,11 +365,9 @@ wlog Mge0 : M / (0 <= M)%R => [sufMge0|] [Mreal solpMinfty_A].
     by rewrite max_real// real0.
   by move=> x; rewrite gt_max => /andP[_]; apply: solpMinfty_A.
 have Kq : K q.
-  apply: compact_closed => //.
-  move=> C qC.
+  apply: compact_closed => // C qC.
   move: plim_q; apply => //.
-  exists 0%R; split => //.
-  move=> t /ltW tge0.
+  exists 0%R; split => // t /ltW tge0.
   exact: Kinvar.
 move=> /(sol_cont Kq) /plim_q q_Bsolt0.
 have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo%R) (sol p @` (> M)%R `&` A).
@@ -404,7 +375,7 @@ have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo%R) (sol p @` (> M)%R `&` A).
 have tge0 : (0 <= t)%R by apply/ltW; apply: le_lt_trans tgtM.
 have Ksolpt : K (sol p t) by apply: Kinvar.
 move=> /(_ Ksolpt) /=; rewrite -solD // => Bsolpt0t; exists (sol p (t0 + t)).
-by split=> //; apply/solpMinfty_A/ltr_wpDl.
+by split=> //; exact/solpMinfty_A/ltr_wpDl.
 Qed.
 
 Definition limS (A : set U) := \bigcup_(q in A) cluster (sol q @ +oo%R).
@@ -423,15 +394,12 @@ move=> fnincr [M ltMf].
 apply/cvg_ex; exists (inf (fun x => x \in f @` (>= 0)%R)).
 move=> A /nbhs_ballP [_ /posnumP[e] infe_A].
 have imf_inf : has_inf (fun x => x \in f @` (>= 0)%R).
-   split; first by exists (f 0%R); rewrite in_setE; apply: imageP.
+  split; first by exists (f 0%R); rewrite in_setE; apply: imageP.
   by exists M; apply/lbP => ?; rewrite in_setE => /ltMf /ltW.
-have := imf_inf => /inf_adherent.
-move=> /(_ e%:num)%R.
-have e0 : (0 < e%:num)%R by [].
-move=> /(_ e0) [x].
-rewrite in_setE => -[t tge0 <-] ltftinfe; exists t; split.
-  by rewrite realE tge0.
-move=> s ltts; apply: infe_A.
+have := imf_inf => /inf_adherent => /(_ e%:num)%R.
+move=> /(_ (gt0 e)) [x].
+rewrite in_setE => -[t tge0 <-] ltftinfe.
+exists t; rewrite num_real; split => // s ltts; apply: infe_A.
 rewrite /ball/=.
 rewrite distrC ger0_norm.
   rewrite ltrBlDl.
@@ -440,7 +408,7 @@ rewrite subr_ge0.
 apply: inf_lbound => //.
   by case: imf_inf.
 rewrite in_setE; apply: imageP.
-by apply: ltW; apply: le_lt_trans ltts.
+by apply: ltW; exact: le_lt_trans ltts.
 Qed.
 
 (* todo: use directional derivative *)
@@ -453,7 +421,7 @@ Proof.
 move=> Vcont Vsol_drvbl Vsol'le0 p [q Kq plimp].
 have ssqRpK : sol q @` (>= 0)%R `<=` K by move=> _ [t tge0 <-]; apply: Kinvar.
 (* should be inferred *)
-have atrF := at_right_proper_filter 0%R.
+(*have atrF := at_right_proper_filter 0%R. (* is it now?*) *)
 suff : exists l, cluster (sol q @ +oo%R) `<=` V @^-1` [set l].
   move=> [l Vpliml]/=; rewrite derive1E /derive cvg_at_rightE; last first.
     apply: Vsol_drvbl => //; apply: compact_closed => //.
@@ -461,20 +429,18 @@ suff : exists l, cluster (sol q @ +oo%R) `<=` V @^-1` [set l].
   apply: (@cvg_lim _ _ _ (at_right _)) => // A A0.
   rewrite !near_simpl; near=> h.
   rewrite /= sol0 addr0.
-  rewrite [X in sol p X](_ : _ = h); last first.
-    by rewrite /GRing.scale/= mulr1.
+  rewrite [X in sol p X](_ : _ = h); last by rewrite scaler1.
   rewrite Vpliml//.
     by rewrite Vpliml // subrr scaler0; apply: nbhs_singleton.
-  by apply: invariant_plim => //; apply: ltW; near: h; exists 1%R => //=.
+  by apply: invariant_plim => //; apply: ltW; near: h; exists 1%R.
 suff cvVsol : cvg (V \o sol q @ +oo%R).
-  exists (lim (V \o sol q @ +oo%R)); apply: (c0_cvg_cst_on_plim Vcont)=> //.
+  exists (lim (V \o sol q @ +oo%R)); apply: (c0_cvg_cst_on_plim Vcont) => //.
   exact: compact_closed.
 apply: nincr_lb_cvg; last first.
   have: compact (V @` K) by apply: continuous_on_compact.
   move=> /compact_bounded [N imVltN].
   exists (- (N + 2))%R=> _ [t tge0 <-].
-  suff : (`|(V \o sol q) t| < N + 2)%R.
-    by rewrite ltr_norml => /andP [].
+  suff : (`|(V \o sol q) t| < N + 2)%R by rewrite ltr_norml => /andP[].
   rewrite (@le_lt_trans _ _ (N + 1)%R)// ?ltrD2l ?ltr1n//.
   by apply: imVltN.2; [rewrite ltrDl|apply/imageP/Kinvar].
 move=> s t /andP [sge0 slet].
@@ -483,14 +449,15 @@ apply: (@ler0_derive1_le_cc _ _ s t); first 2 last.
   rewrite inE/= in_itv/= => /andP[sx xt].
   have := Vsol_drvbl _ _ Kq (le_trans sge0 sx).
   move/derivable1_diffP/differentiable_continuous.
-  by apply.
+  exact.
   by rewrite in_itv/= slet lexx.
   by rewrite in_itv/= lexx slet.
   by [].
   move=> r rst.
   apply: Vsol_drvbl => //; apply: le_trans sge0 _.
   by rewrite (itvP rst).
-move=> r rst; have rge0 : (0 <= r)%R by apply: le_trans sge0 _; rewrite (itvP rst).
+move=> r rst.
+have rge0 : (0 <= r)%R by apply: le_trans sge0 _; rewrite (itvP rst).
 suff -> : derive1 (V \o sol q) r = derive1 (V \o (sol (sol q r))) 0.
   exact/Vsol'le0/Kinvar.
 rewrite derive1E /derive cvg_at_rightE; last exact: Vsol_drvbl.
@@ -499,12 +466,11 @@ rewrite derive1E /derive cvg_at_rightE; last first.
 congr (lim _); rewrite predeqE /= nbhs_filterE => A; split.
   move=> [_/posnumP[e] Ae]; exists e%:num%R=> //= x xe xgt0.
   rewrite sol0/=.
-  rewrite addr0 -solD //; [by apply: Ae|].
-  by rewrite /GRing.scale/= mulr1 ltW.
+  rewrite addr0 -solD //; [exact: Ae|].
+  by rewrite scaler1 ltW.
 move=> [_/posnumP[e] Ae]; exists e%:num%R => //= x xe xgt0.
 have /Ae - /(_ xe) := xgt0.
-rewrite sol0/= addr0 -solD //.
-by rewrite /GRing.scale/= mulr1 ltW.
+by rewrite sol0/= addr0 -solD// scaler1 ltW.
 Unshelve. all: by end_near. Qed.
 
 Lemma cvg_to_limS (A : set U) : compact A -> is_invariant A ->
@@ -513,8 +479,9 @@ Proof.
 move=> Aco Ainvar p Ap B [_/posnumP[e] limSeB].
 apply: (cvg_to_plim _ Aco).
   exists 0%R; split => //.
-  by move=> _/posnumP[?]; apply: Ainvar.
-by exists e%:num%R=> //= q [r plimr re_q]; apply: limSeB; exists r => //; exists p.
+  by move=> _/posnumP[?]; exact: Ainvar.
+exists e%:num%R=> //= q [r plimr re_q].
+by apply: limSeB; exists r => //; exists p.
 Qed.
 
 End DifferentialSystem.
