@@ -1,3 +1,7 @@
+(* LaSalle (c) 2025 Inria and AIST. Licence: CeCILL-C.                        *)
+(* -------------------------------------------------------------------------- *)
+(* Copyright (c) - 2017 -- 2019 Inria                                         *)
+(* -------------------------------------------------------------------------- *)
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice seq.
 From mathcomp Require Import order interval_inference.
