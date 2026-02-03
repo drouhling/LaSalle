@@ -144,23 +144,20 @@ Lemma sub_plim_clos_invar (y : R -> U) (A : set U) :
   y @` (>= 0)%R `<=` A -> cluster (y @ +oo%R) `<=` closure A.
 Proof. by move=> syRpA p ypp B /ypp; apply; exact: sub_image_at_infty. Qed.
 
-(* to mathcomp/analysis ? *)
-Definition continuous_on (T U : topologicalType) (A : set T) (f : T -> U) :=
-  forall p : T, A p -> f @ (within A (nbhs p)) --> f p.
-
 Lemma map_sub_cluster (S T : topologicalType) (F : set_system S) (f : S -> T)
-  (A : set S) : Filter F -> continuous_on A f -> F A -> closed A ->
+  (A : set S) : Filter F -> {within A, continuous f} -> F A -> closed A ->
   f @` (cluster F) `<=` cluster (f @ F).
 Proof.
 move=> Ffilt fcont FA Acl _ [p clFp <-] B C fFB.
 have Ap : A p by apply: Acl => ? /clFp - /(_ _ FA).
+move/subspace_continuousP in fcont.
 move=> /(fcont _ Ap) fp_C.
 suff /clFp /(_ fp_C) [q [[Aq ?] /(_ Aq)]] : F (A `&` f @^-1` B) by exists (f q).
 exact: filterI.
 Qed.
 
 Lemma c0_cvg_cst_on_plim A (y : R -> U) (V : U -> R^o) (l : R^o) :
-  continuous_on A V -> V \o y @ +oo%R --> l ->
+  {within A, continuous V} -> V \o y @ +oo%R --> l ->
   closed A -> y @` (>= 0)%R `<=` A -> cluster (y @ +oo%R) `<=` V @^-1` [set l].
 Proof.
 move=> Vcont Vypl Acl syRpA p plimp.
@@ -194,23 +191,6 @@ apply/ltW; apply: lt_le_trans pN_yt _.
 rewrite lerBrDr addrC -lerBrDr; apply: ybndN; last by exists t.
 by rewrite ltrBrDr; near: M; exists (N + N)%R; rewrite realD.
 Unshelve. all: by end_near. Qed.
-
-Lemma continuous_on_compact (S T : topologicalType) (f : S -> T) (A : set S) :
-  continuous_on A f -> compact A -> compact (f @` A).
-Proof.
-move=> fcont Aco F FF FfA; set G := filter_from F (fun C => A `&` f @^-1` C).
-have GF : ProperFilter G.
-  apply: (filter_from_proper (filter_from_filter _ _)); first by exists (f @` A).
-    move=> C1 C2 F1 F2; exists (C1 `&` C2); first exact: filterI.
-    by move=> ?[?[]]; split; split.
-  by move=> C /(filterI FfA) /filter_ex [_ [[p ? <-]]]; eexists p.
-move: Aco => /(_ G GF)[].
-  by exists (f @` A) => // ? [].
-move=> p [Ap clsGp]; exists (f p); split; first exact/imageP.
-move=> B C FB /(fcont _ Ap) /= p_Cf.
-have : G (A `&` f @^-1` B) by exists B.
-by move=> /clsGp /(_ p_Cf) [q [[Aq ?] /(_ Aq)]]; exists (f q).
-Qed.
 
 (* TODO: PR to mathcomp-analysis? *)
 Lemma nearN (R : realFieldType) (P : set R) :
@@ -246,7 +226,7 @@ Hypothesis Kco : compact K.
 Variable sol : U -> R -> U.
 Hypothesis (sol0 : forall p, sol p 0 = p).
 Hypothesis solP : forall y : R -> U, K (y 0%R) -> is_sol y <-> y = sol (y 0%R).
-Hypothesis sol_cont : forall t, continuous_on K (sol^~ t).
+Hypothesis sol_cont : forall t, {within K, continuous (sol^~ t)}.
 
 Lemma sol_is_sol p : K p -> is_sol (sol p).
 Proof. by move=> Kp; apply/solP; rewrite sol0. Qed.
@@ -373,7 +353,10 @@ have Kq : K q.
   move: plim_q; apply => //.
   exists 0%R; split => // t /ltW tge0.
   exact: Kinvar.
-move=> /(sol_cont Kq) /plim_q q_Bsolt0.
+have sol_cont' : forall t : R,
+    (forall x : U, K x -> (sol^~ t) x @[x --> within K (nbhs x)] --> (sol^~ t) x).
+  by move=> t; exact/subspace_continuousP/sol_cont.
+move=> /(sol_cont' t0 _ Kq) /plim_q q_Bsolt0.
 have /q_Bsolt0 [_ [[[t tgtM <-] _]]] : (sol p @ +oo%R) (sol p @` (> M)%R `&` A).
   by exists M; split => // => t tgtM; split; [apply: imageP|apply: solpMinfty_A].
 have tge0 : (0 <= t)%R by apply/ltW; apply: le_lt_trans tgtM.
@@ -417,7 +400,7 @@ Qed.
 
 (* todo: use directional derivative *)
 Lemma stable_limS (V : U -> R^o) :
-  continuous_on K V ->
+  {within K, continuous V} ->
   (forall p t, K p -> (0 <= t)%R -> derivable (V \o sol p : R^o -> R^o) t 1) ->
   (forall (p : U), K p -> derive1 (V \o sol p) 0 <= 0)%R ->
   limS K `<=` [set p | derive1 (V \o sol p) 0 = 0]%R.
@@ -441,7 +424,7 @@ suff cvVsol : cvg (V \o sol q @ +oo%R).
   exists (lim (V \o sol q @ +oo%R)); apply: (c0_cvg_cst_on_plim Vcont) => //.
   exact: compact_closed.
 apply: nincr_lb_cvg; last first.
-  have: compact (V @` K) by apply: continuous_on_compact.
+  have: compact (V @` K) by exact: continuous_compact.
   move=> /compact_bounded [N imVltN].
   exists (- (N + 2))%R=> _ [t tge0 <-].
   suff : (`|(V \o sol q) t| < N + 2)%R by rewrite ltr_norml => /andP[].

@@ -199,7 +199,7 @@ have comp_lin : linear (fun q : 'rV[R]_n.+1 => q..[i] : R^o).
   by move=> ???; rewrite !mxE.
 have comp_cont : continuous (fun q : 'rV[R]_n.+1 => q..[i] : R^o).
   move=> q A [_/posnumP[e] Ae] /=; apply/nbhs_ballP; exists e%:num => //=.
-  by move=> r /(_ ord0) /(_ (inZp i)) /Ae.
+  by move=> r [e0] /(_ ord0) /(_ (inZp i)) /Ae.
 pose glM := GRing.isLinear.Build _ _ _ _ _ comp_lin.
 pose gL : {linear 'rV_n.+1 -> R^o} := HB.pack (fun q : 'rV_n.+1 => q ..[ i]) glM.
 apply: DiffDef; first exact: (@linear_differentiable _ _ _ gL).
@@ -262,7 +262,7 @@ move=> /expr_continuous [_/posnumP[e1] p2e1_sp2he].
 have : nbhs (p ..[ 3] ^+ 2) (ball (p ..[ 3] ^+ 2) ((e%:num / 2)%:pos)%:num).
   by apply: nbhsx_ballx.
 move=> /expr_continuous [_ /posnumP[e2] p3e2_sp3he].
-have [q [circq pme12_q]] :
+have [q [circq [e0 pme12_q]]] :
   [set p : U | p..[2] ^+ 2 + p..[3] ^+ 2 = 1] `&`
   ball p (minr e1%:num e2%:num) !=set0.
    apply/clcircp.
@@ -401,7 +401,7 @@ Qed.
 Variable sol : U -> R -> U.
 Hypothesis (sol0 : forall p, sol p 0 = p).
 Hypothesis solP : forall y, K (y 0) -> is_sol Fpendulum y <-> y = sol (y 0).
-Hypothesis sol_cont : forall t, continuous_on K (sol^~ t).
+Hypothesis sol_cont : forall t, {within K, continuous (sol^~ t)}.
 
 Lemma circ_invar p :
   K p -> forall t, 0 <= t -> (sol p t)..[2] ^+ 2 + (sol p t)..[3] ^+ 2 = 1.
@@ -450,12 +450,15 @@ rewrite -addrA [_ * (_ * (- _ * _))]mulrA -mulrDl.
 apply/(canLR (subrK _))/(canLR (mulfK _)); first by rewrite circp.
 rewrite [RHS]mulrDl !mulNr [in RHS]mulrAC; apply: (canRL (addrK _)).
 rewrite [(_ + _) * _]mulrDr addrAC [_ + _ * y + _]addrAC.
+by field; rewrite gt_eqF.
+(* this used to work with MathComp 2.4.0:
 apply: (canLR (subrK _)); rewrite -mulrBl [_ * (_ + y)]mulrDr opprD addrA.
 rewrite [_ * (_ - _ * y)]mulrDr addrA -[- (_ * y)]mulNr [_ * (_ * y)]mulrA.
 rewrite [_ + _ * y + _]addrAC; apply: (canLR (subrK _)); rewrite -mulrBl.
 rewrite [in RHS]mulrN opprK mulrACA [_ ^+2 / _]mulrAC mulfVK//.
 rewrite [_ / _]mulrC ![_^-1 * _]mulrA [_^-1 * _ * _]mulrC mulVKf//.
 ring.
+*)
 Qed.
 
 Lemma is_deriv_Vsol p t :
@@ -629,7 +632,7 @@ have -> : derive1 (V \o sol p : _ -> R^o) t =
   rewrite -(solD sol0 solP Kinvar) //.
   by rewrite add0r.
 apply: (stable_limS K_compact sol0 solP sol_cont Kinvar (V:=V)) limSKsolp.
-- move=> q Kq; have /(_ q) := V_continuous; apply: cvg_trans.
+- apply/subspace_continuousP => q Kq; have /(_ q) := V_continuous; apply: cvg_trans.
   exact: cvg_app (@cvg_within _ _ _ _).
 - by move=> q s Kq sge0; have := is_derive_Vsol Kq sge0.
 - move=> q Kq; have dVsolq := is_derive_Vsol Kq (lexx _).
